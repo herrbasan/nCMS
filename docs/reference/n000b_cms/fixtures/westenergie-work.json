@@ -1,0 +1,532 @@
+{
+    "sections":  [
+                     {
+                         "name":  "header",
+                         "type":  "fixed",
+                         "label":  "Header",
+                         "groups":  [
+                                        {
+                                            "type":  "vars",
+                                            "label":  "Variables",
+                                            "data":  [
+                                                         {
+                                                             "type":  "input",
+                                                             "id":  "vars_project",
+                                                             "label":  "Project",
+                                                             "data":  "Westenergie Web APP"
+                                                         },
+                                                         {
+                                                             "type":  "input",
+                                                             "id":  "vars_customer",
+                                                             "label":  "Customer",
+                                                             "data":  "Westenergie"
+                                                         },
+                                                         {
+                                                             "type":  "input",
+                                                             "id":  "vars_agency",
+                                                             "label":  "Agency",
+                                                             "data":  "Zink Projects"
+                                                         },
+                                                         {
+                                                             "type":  "input",
+                                                             "id":  "vars_date",
+                                                             "label":  "Year",
+                                                             "data":  "2021"
+                                                         },
+                                                         {
+                                                             "type":  "input",
+                                                             "id":  "vars_location",
+                                                             "label":  "Location",
+                                                             "data":  ""
+                                                         },
+                                                         {
+                                                             "type":  "tags",
+                                                             "id":  "vars_tags",
+                                                             "label":  "Categories",
+                                                             "data":  [
+                                                                          "WkDE5JCJ8llOLubS",
+                                                                          "3WGMiTEeThk6q031",
+                                                                          "5I9mvUNh93jzocHU",
+                                                                          "lSIGfoFUFIauodKY"
+                                                                      ],
+                                                             "db":  "8CyGWOhE6abpWkkL"
+                                                         }
+                                                     ],
+                                            "idx":  0,
+                                            "name":  "variables"
+                                        },
+                                        {
+                                            "label":  "Cover",
+                                            "type":  "media",
+                                            "data":  [
+                                                         {
+                                                             "bucket":  "OHCYUOGZpiCB2BjB",
+                                                             "filename":  "westenergie_webapp.mp4_snap_00007.png",
+                                                             "filesize":  987505,
+                                                             "ext":  "png",
+                                                             "mime":  "image/png",
+                                                             "f_date":  1697391815225,
+                                                             "c_date":  1697444439426,
+                                                             "m_date":  1698994807347,
+                                                             "_id":  "znLiGMaZF3pvwS8t",
+                                                             "media_post":  {
+                                                                                "big_avif":  {
+                                                                                                 "width":  3314,
+                                                                                                 "height":  2114,
+                                                                                                 "size":  72766
+                                                                                             },
+                                                                                "medium_avif":  {
+                                                                                                    "width":  1920,
+                                                                                                    "height":  1225,
+                                                                                                    "size":  45498
+                                                                                                },
+                                                                                "thumb_avif":  {
+                                                                                                   "width":  1024,
+                                                                                                   "height":  653,
+                                                                                                   "size":  23880
+                                                                                               },
+                                                                                "big_webp":  {
+                                                                                                 "width":  3314,
+                                                                                                 "height":  2114,
+                                                                                                 "size":  139712
+                                                                                             },
+                                                                                "medium_webp":  {
+                                                                                                    "width":  1920,
+                                                                                                    "height":  1225,
+                                                                                                    "size":  78800
+                                                                                                },
+                                                                                "thumb_webp":  {
+                                                                                                   "width":  1024,
+                                                                                                   "height":  653,
+                                                                                                   "size":  38036
+                                                                                               },
+                                                                                "big_jpg":  {
+                                                                                                "width":  3314,
+                                                                                                "height":  2114,
+                                                                                                "size":  331281
+                                                                                            },
+                                                                                "medium_jpg":  {
+                                                                                                   "width":  1920,
+                                                                                                   "height":  1225,
+                                                                                                   "size":  165434
+                                                                                               },
+                                                                                "thumb_jpg":  {
+                                                                                                  "width":  1024,
+                                                                                                  "height":  653,
+                                                                                                  "size":  71040
+                                                                                              },
+                                                                                "thumb_cms":  {
+                                                                                                  "width":  128,
+                                                                                                  "height":  82,
+                                                                                                  "size":  1774
+                                                                                              },
+                                                                                "bench":  1130
+                                                                            }
+                                                         }
+                                                     ],
+                                            "idx":  1,
+                                            "name":  "cover"
+                                        },
+                                        {
+                                            "type":  "vars",
+                                            "label":  "Involvement",
+                                            "data":  [
+                                                         {
+                                                             "type":  "input",
+                                                             "numeric":  true,
+                                                             "id":  "vars_concept",
+                                                             "label":  "Concept / Planning",
+                                                             "data":  "50"
+                                                         },
+                                                         {
+                                                             "type":  "input",
+                                                             "numeric":  true,
+                                                             "id":  "vars_design",
+                                                             "label":  "Design",
+                                                             "data":  "30"
+                                                         },
+                                                         {
+                                                             "type":  "input",
+                                                             "numeric":  true,
+                                                             "id":  "vars_programming",
+                                                             "label":  "Programming",
+                                                             "data":  "100"
+                                                         },
+                                                         {
+                                                             "type":  "input",
+                                                             "numeric":  true,
+                                                             "id":  "vars_video",
+                                                             "label":  "Video Production / Editing",
+                                                             "data":  0
+                                                         },
+                                                         {
+                                                             "type":  "input",
+                                                             "numeric":  true,
+                                                             "id":  "vars_motion",
+                                                             "label":  "Motiondesign / Animation",
+                                                             "data":  "100"
+                                                         },
+                                                         {
+                                                             "type":  "input",
+                                                             "numeric":  true,
+                                                             "id":  "vars_music",
+                                                             "label":  "Music Production / Composition",
+                                                             "data":  0
+                                                         },
+                                                         {
+                                                             "type":  "input",
+                                                             "numeric":  true,
+                                                             "id":  "vars_sound",
+                                                             "label":  "Sounddesign",
+                                                             "data":  0
+                                                         }
+                                                     ],
+                                            "idx":  2,
+                                            "name":  "involvement"
+                                        }
+                                    ],
+                         "idx":  0
+                     },
+                     {
+                         "name":  "section",
+                         "label":  "Section",
+                         "groups":  [
+                                        {
+                                            "label":  "FDAR Headline",
+                                            "type":  "richtext",
+                                            "data":  "\u003ch1\u003eScreenshots\u003c/h1\u003e",
+                                            "idx":  0,
+                                            "name":  "fdar_headline"
+                                        },
+                                        {
+                                            "label":  "FDAR 3 Media Columns",
+                                            "type":  "columns",
+                                            "columns":  [
+                                                            [
+                                                                {
+                                                                    "type":  "media",
+                                                                    "label":  "Media",
+                                                                    "data":  [
+                                                                                 {
+                                                                                     "bucket":  "OHCYUOGZpiCB2BjB",
+                                                                                     "filename":  "westenergie_webapp.mp4_snap_00001.png",
+                                                                                     "filesize":  1097432,
+                                                                                     "ext":  "png",
+                                                                                     "mime":  "image/png",
+                                                                                     "f_date":  1697391732352,
+                                                                                     "c_date":  1697444439426,
+                                                                                     "m_date":  1698994815717,
+                                                                                     "_id":  "IsFI4SLnOrI8npka",
+                                                                                     "media_post":  {
+                                                                                                        "big_avif":  {
+                                                                                                                         "width":  3314,
+                                                                                                                         "height":  2114,
+                                                                                                                         "size":  76477
+                                                                                                                     },
+                                                                                                        "medium_avif":  {
+                                                                                                                            "width":  1920,
+                                                                                                                            "height":  1225,
+                                                                                                                            "size":  47029
+                                                                                                                        },
+                                                                                                        "thumb_avif":  {
+                                                                                                                           "width":  1024,
+                                                                                                                           "height":  653,
+                                                                                                                           "size":  24528
+                                                                                                                       },
+                                                                                                        "big_webp":  {
+                                                                                                                         "width":  3314,
+                                                                                                                         "height":  2114,
+                                                                                                                         "size":  142314
+                                                                                                                     },
+                                                                                                        "medium_webp":  {
+                                                                                                                            "width":  1920,
+                                                                                                                            "height":  1225,
+                                                                                                                            "size":  80652
+                                                                                                                        },
+                                                                                                        "thumb_webp":  {
+                                                                                                                           "width":  1024,
+                                                                                                                           "height":  653,
+                                                                                                                           "size":  38884
+                                                                                                                       },
+                                                                                                        "big_jpg":  {
+                                                                                                                        "width":  3314,
+                                                                                                                        "height":  2114,
+                                                                                                                        "size":  332131
+                                                                                                                    },
+                                                                                                        "medium_jpg":  {
+                                                                                                                           "width":  1920,
+                                                                                                                           "height":  1225,
+                                                                                                                           "size":  165030
+                                                                                                                       },
+                                                                                                        "thumb_jpg":  {
+                                                                                                                          "width":  1024,
+                                                                                                                          "height":  653,
+                                                                                                                          "size":  69278
+                                                                                                                      },
+                                                                                                        "thumb_cms":  {
+                                                                                                                          "width":  128,
+                                                                                                                          "height":  82,
+                                                                                                                          "size":  1638
+                                                                                                                      },
+                                                                                                        "bench":  1077
+                                                                                                    }
+                                                                                 }
+                                                                             ],
+                                                                    "parent_name":  "C1",
+                                                                    "idx":  0,
+                                                                    "name":  "media"
+                                                                }
+                                                            ],
+                                                            [
+                                                                {
+                                                                    "type":  "media",
+                                                                    "label":  "Media",
+                                                                    "data":  [
+                                                                                 {
+                                                                                     "bucket":  "OHCYUOGZpiCB2BjB",
+                                                                                     "filename":  "westenergie_webapp.mp4_snap_00008.png",
+                                                                                     "filesize":  1243261,
+                                                                                     "ext":  "png",
+                                                                                     "mime":  "image/png",
+                                                                                     "f_date":  1697391826604,
+                                                                                     "c_date":  1697444439426,
+                                                                                     "m_date":  1698994816924,
+                                                                                     "_id":  "DLWtawgF6PCBlBfs",
+                                                                                     "media_post":  {
+                                                                                                        "big_avif":  {
+                                                                                                                         "width":  3314,
+                                                                                                                         "height":  2114,
+                                                                                                                         "size":  94535
+                                                                                                                     },
+                                                                                                        "medium_avif":  {
+                                                                                                                            "width":  1920,
+                                                                                                                            "height":  1225,
+                                                                                                                            "size":  60002
+                                                                                                                        },
+                                                                                                        "thumb_avif":  {
+                                                                                                                           "width":  1024,
+                                                                                                                           "height":  653,
+                                                                                                                           "size":  29720
+                                                                                                                       },
+                                                                                                        "big_webp":  {
+                                                                                                                         "width":  3314,
+                                                                                                                         "height":  2114,
+                                                                                                                         "size":  175910
+                                                                                                                     },
+                                                                                                        "medium_webp":  {
+                                                                                                                            "width":  1920,
+                                                                                                                            "height":  1225,
+                                                                                                                            "size":  100732
+                                                                                                                        },
+                                                                                                        "thumb_webp":  {
+                                                                                                                           "width":  1024,
+                                                                                                                           "height":  653,
+                                                                                                                           "size":  47916
+                                                                                                                       },
+                                                                                                        "big_jpg":  {
+                                                                                                                        "width":  3314,
+                                                                                                                        "height":  2114,
+                                                                                                                        "size":  398397
+                                                                                                                    },
+                                                                                                        "medium_jpg":  {
+                                                                                                                           "width":  1920,
+                                                                                                                           "height":  1225,
+                                                                                                                           "size":  199017
+                                                                                                                       },
+                                                                                                        "thumb_jpg":  {
+                                                                                                                          "width":  1024,
+                                                                                                                          "height":  653,
+                                                                                                                          "size":  85054
+                                                                                                                      },
+                                                                                                        "thumb_cms":  {
+                                                                                                                          "width":  128,
+                                                                                                                          "height":  82,
+                                                                                                                          "size":  1970
+                                                                                                                      },
+                                                                                                        "bench":  1190
+                                                                                                    }
+                                                                                 }
+                                                                             ],
+                                                                    "parent_name":  "C2",
+                                                                    "idx":  0,
+                                                                    "name":  "media"
+                                                                }
+                                                            ],
+                                                            [
+                                                                {
+                                                                    "type":  "media",
+                                                                    "label":  "Media",
+                                                                    "data":  [
+                                                                                 {
+                                                                                     "bucket":  "OHCYUOGZpiCB2BjB",
+                                                                                     "filename":  "westenergie_webapp.mp4_snap_00009.png",
+                                                                                     "filesize":  567732,
+                                                                                     "ext":  "png",
+                                                                                     "mime":  "image/png",
+                                                                                     "f_date":  1697391838248,
+                                                                                     "c_date":  1697444439426,
+                                                                                     "m_date":  1698994809460,
+                                                                                     "_id":  "smxH2cuKzlur008C",
+                                                                                     "media_post":  {
+                                                                                                        "big_avif":  {
+                                                                                                                         "width":  3314,
+                                                                                                                         "height":  2114,
+                                                                                                                         "size":  42600
+                                                                                                                     },
+                                                                                                        "medium_avif":  {
+                                                                                                                            "width":  1920,
+                                                                                                                            "height":  1225,
+                                                                                                                            "size":  27410
+                                                                                                                        },
+                                                                                                        "thumb_avif":  {
+                                                                                                                           "width":  1024,
+                                                                                                                           "height":  653,
+                                                                                                                           "size":  14805
+                                                                                                                       },
+                                                                                                        "big_webp":  {
+                                                                                                                         "width":  3314,
+                                                                                                                         "height":  2114,
+                                                                                                                         "size":  82290
+                                                                                                                     },
+                                                                                                        "medium_webp":  {
+                                                                                                                            "width":  1920,
+                                                                                                                            "height":  1225,
+                                                                                                                            "size":  46240
+                                                                                                                        },
+                                                                                                        "thumb_webp":  {
+                                                                                                                           "width":  1024,
+                                                                                                                           "height":  653,
+                                                                                                                           "size":  22442
+                                                                                                                       },
+                                                                                                        "big_jpg":  {
+                                                                                                                        "width":  3314,
+                                                                                                                        "height":  2114,
+                                                                                                                        "size":  208089
+                                                                                                                    },
+                                                                                                        "medium_jpg":  {
+                                                                                                                           "width":  1920,
+                                                                                                                           "height":  1225,
+                                                                                                                           "size":  105528
+                                                                                                                       },
+                                                                                                        "thumb_jpg":  {
+                                                                                                                          "width":  1024,
+                                                                                                                          "height":  653,
+                                                                                                                          "size":  47717
+                                                                                                                      },
+                                                                                                        "thumb_cms":  {
+                                                                                                                          "width":  128,
+                                                                                                                          "height":  82,
+                                                                                                                          "size":  1804
+                                                                                                                      },
+                                                                                                        "bench":  783
+                                                                                                    }
+                                                                                 }
+                                                                             ],
+                                                                    "parent_name":  "C3",
+                                                                    "idx":  0,
+                                                                    "name":  "media"
+                                                                }
+                                                            ]
+                                                        ],
+                                            "idx":  1,
+                                            "name":  "fdar_3_media_columns"
+                                        }
+                                    ],
+                         "idx":  1
+                     },
+                     {
+                         "name":  "section",
+                         "label":  "Section",
+                         "groups":  [
+                                        {
+                                            "label":  "FDAR Headline",
+                                            "type":  "richtext",
+                                            "data":  "\u003ch1\u003eScreencapture\u003c/h1\u003e",
+                                            "idx":  0,
+                                            "name":  "fdar_headline"
+                                        },
+                                        {
+                                            "type":  "media",
+                                            "label":  "Media",
+                                            "data":  [
+                                                         {
+                                                             "bucket":  "OHCYUOGZpiCB2BjB",
+                                                             "filename":  "Westenergie Webapp_hd.mp4",
+                                                             "filesize":  7710585,
+                                                             "ext":  "mp4",
+                                                             "mime":  "video/mp4",
+                                                             "f_date":  1697385472294,
+                                                             "c_date":  1697444439426,
+                                                             "m_date":  1698994817597,
+                                                             "_id":  "4uIsX2ysNfK3NUFm",
+                                                             "media_post":  {
+                                                                                "big_avif":  {
+                                                                                                 "width":  1694,
+                                                                                                 "height":  1080,
+                                                                                                 "size":  51626
+                                                                                             },
+                                                                                "medium_avif":  {
+                                                                                                    "width":  1694,
+                                                                                                    "height":  1080,
+                                                                                                    "size":  51626
+                                                                                                },
+                                                                                "thumb_avif":  {
+                                                                                                   "width":  1024,
+                                                                                                   "height":  653,
+                                                                                                   "size":  27431
+                                                                                               },
+                                                                                "big_webp":  {
+                                                                                                 "width":  1694,
+                                                                                                 "height":  1080,
+                                                                                                 "size":  84938
+                                                                                             },
+                                                                                "medium_webp":  {
+                                                                                                    "width":  1694,
+                                                                                                    "height":  1080,
+                                                                                                    "size":  84938
+                                                                                                },
+                                                                                "thumb_webp":  {
+                                                                                                   "width":  1024,
+                                                                                                   "height":  653,
+                                                                                                   "size":  43390
+                                                                                               },
+                                                                                "big_jpg":  {
+                                                                                                "width":  1694,
+                                                                                                "height":  1080,
+                                                                                                "size":  128963
+                                                                                            },
+                                                                                "medium_jpg":  {
+                                                                                                   "width":  1694,
+                                                                                                   "height":  1080,
+                                                                                                   "size":  128963
+                                                                                               },
+                                                                                "thumb_jpg":  {
+                                                                                                  "width":  1024,
+                                                                                                  "height":  653,
+                                                                                                  "size":  75839
+                                                                                              },
+                                                                                "thumb_cms":  {
+                                                                                                  "width":  128,
+                                                                                                  "height":  82,
+                                                                                                  "size":  1910
+                                                                                              },
+                                                                                "bench":  655
+                                                                            }
+                                                         }
+                                                     ],
+                                            "idx":  1,
+                                            "name":  "media",
+                                            "class":  "autoplay"
+                                        }
+                                    ],
+                         "idx":  2
+                     }
+                 ],
+    "name":  "Westenergie Web APP",
+    "customer":  "Westenergie",
+    "year":  "2021",
+    "date":  1609455600000,
+    "c_date":  1697444526494,
+    "m_date":  1727157964923,
+    "_id":  "NQgIroSLru3XfQF6"
+}
