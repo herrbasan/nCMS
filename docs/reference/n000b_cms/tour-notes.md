@@ -123,7 +123,7 @@ Section-level palette observed: `Media`, `Text`, `Input`, `Richtext`, `Two Colum
 
 ---
 
-## 4. Screenshots index (`docs/reference/n000b_cms/screenshots/`)
+## 4. Screenshots index (`screenshots/`, relative to this file)
 
 | # | file | screen |
 |---|------|--------|

@@ -3,10 +3,12 @@
 > **Purpose:** A model that reads this should understand exactly how the n000b CMS works *without*
 > running the live tour. It is the distilled, LLM-readable version of the interactive walkthrough.
 > **Scope:** the `html_fdar` instance at `D:\Work\_GIT\# n000b_cms\html_fdar`, live admin at
-> `http://localhost:3200/admin/`. Screenshots referenced throughout live in
-> `reference/n000b_cms/screenshots/` (paths below are relative to `docs/`).
-> Parent plan: [cms-migration-plan.md](cms-migration-plan.md); raw walkthrough notes in
-> [reference/n000b_cms/tour-notes.md](reference/n000b_cms/tour-notes.md).
+> `http://localhost:3200/admin/`. Screenshots referenced throughout live in `screenshots/`
+> (relative to this file). Parent plan: [../../cms-migration-plan.md](../../cms-migration-plan.md);
+> raw walkthrough notes in [tour-notes.md](tour-notes.md).
+>
+> **This describes the OLD system (frozen).** Statements about the new CMS live exclusively in the
+> parent plan — the plan references this spec, never the other way around.
 
 ---
 

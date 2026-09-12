@@ -22,12 +22,35 @@ Two-phase effort:
 
 ## Layout
 
-- [docs/cms-migration-plan.md](docs/cms-migration-plan.md) — migration vision, invariants, plan.
-- [docs/cms-spec.md](docs/cms-spec.md) — self-contained spec of the existing n000b CMS (distilled from the live tour).
-- [docs/reference/n000b_cms/](docs/reference/n000b_cms/) — the legacy-CMS tour: `tour-notes.md`
+- [docs/cms-migration-plan.md](docs/cms-migration-plan.md) — migration vision, invariants, plan (the living doc).
+- [docs/reference/n000b_cms/](docs/reference/n000b_cms/) — everything about the **old** system, frozen:
+  `n000b_cms_spec.md` (distilled spec — old-system facts live here, never in the plan), `tour-notes.md`
   (walkthrough notes — the current editor's UX is the format's spec), `screenshots/` (admin tour
-  screenshots referenced by `cms-spec.md`), `fixtures/` (real CMS content export,
-  `westenergie-work.json`).
+  screenshots referenced by the spec), `fixtures/` (real CMS content export, `westenergie-work.json`).
+
+## Submodules & key documentation
+
+Submodules live in `modules/` — each on its tracked branch (never detached HEAD), so VS Code
+surfaces upstream drift. Fast-forward sync only; never `git submodule update --remote`.
+
+- `modules/nDB` — storage engine (napi, in-process). Docs: [modules/nDB/documentation](modules/nDB/documentation)
+  — start with `architecture.md` and `nodejs-api.md` (nCMS is Node); also `query-language.md`,
+  `common-patterns.md`, `file-buckets.md` (media storage), `cli.md`, `rust-api.md`.
+- `modules/nui_wc2` — frontend/admin component library. Docs: [modules/nui_wc2/documentation](modules/nui_wc2/documentation)
+  — `components.json` (registry), `components/` and `addons/` (per-component reference),
+  `guides/` (getting-started, declarative-actions, architecture-patterns, utilities).
+- `modules/md-blocks` — **the authoring format of the new CMS.** Spec:
+  [modules/md-blocks/md-blocks-spec.md](modules/md-blocks/md-blocks-spec.md). Content entries are
+  authored in MD-Blocks; the renderer (`nui-blocks`) and the block-editor component are nui-side
+  consumers developed here.
+
+## Editing model (vision)
+
+The CMS exposes an HTTP API to create/edit/delete entries and maintain media — deliberately
+LLLM-editable. Two editing pathways:
+
+1. **The Chat app** as a direct client of the nCMS API (LLLM-driven authoring).
+2. **The admin UI** with a block-editor — a new `nui_wc2` component to be developed in this project.
 
 ## MD-Blocks — moved to its own repo
 
