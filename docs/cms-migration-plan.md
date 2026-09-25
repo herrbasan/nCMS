@@ -119,7 +119,7 @@ invention.**
 
 | Old CMS | `nui_wc2` | Notes |
 |---|---|---|
-| left scope axis, multi-level | `nui-link-list` (core) | collapsible groups, active state, `mode="tree\|fold"` |
+| left scope axis, multi-level | `nui-link-list` (core) | collapsible groups, active state, `mode="tree\|fold"`, **trailing row actions** |
 | main pane, virtualized | `nui-list` (**addon**) | search + sort + filter + lazy media **built in** |
 | raw document editing | `nui-code-editor` (addon) | live highlighting, line numbers — the JSON-editor path |
 | prose editing | `nui-rich-text` (addon) | settled: **better than Trumbowyg, no port** |
@@ -135,11 +135,26 @@ invention.**
 | notifications | `nui-banner` (core) | edge-anchored, singleton per placement |
 | progress | `nui-progress` (core) | job progress |
 
-**Gap, already identified and needed:** `nui-link-list` has **no trailing control on a row**. The old
-sidebar puts a gear on the `Database` row — a row that owns children — to open the *set* editor, while its
-children carry the leading chevron. So the axis must be able to carry an action that is a **control, not
-navigation** (clicking it must not select or expand). Needed for bucket/table create-edit-delete.
-*Open question:* generic slot on any row at any depth, or restricted to rows with children?
+**The row action — resolved 2026-09-25.** The old sidebar puts a gear on the `Database` row (a row that
+owns children) to open the *set* editor, while its children carry the leading chevron. The axis therefore
+has to carry an action that is a **control, not navigation**, on a row that is otherwise a container.
+
+This was first recorded here as a **missing concept**. That was wrong, and the correction is the most
+useful thing the first build step produced:
+
+- `nui-link-list` already rendered such a control **declaratively** — the Playground demonstrates it.
+- Its data-driven builder already had a `headerAction` key for it: group-headers only, hardcoded to the
+  `settings` icon and `aria-label="Settings"`, **undocumented, and used nowhere in the library**.
+
+So the gap was an **unfinished feature, not a missing one** — and neither the component doc, the registry,
+notation nor the demo revealed that. Only reading the implementation did. **Treat §4's mapping as a starting
+point to verify, not a specification.**
+
+Generalized and shipped in `nui_wc2` `ae947d6`: `rowAction` works on any item at any depth, accepts a
+data-action string or `{action, icon, label}`, keeps `headerAction` as an alias, and escapes attribute
+values. It renders as a *sibling* of the link / group toggle, so clicking it never activates or expands the
+row. Verified live: it fires `nui-action` with the right name and param while `a.active` stays null and
+`aria-expanded` stays `"false"`.
 
 **Other absences worth knowing** (from the library registry, 2026-09-22 — absence from the registry is not
 proof of absence from the library): no split-pane primitive (the sidebar overlays rather than splitting),
@@ -251,8 +266,10 @@ consumer. Plain JSON, predictable errors, no UI-coupled state.
 
 Top-down: the pattern first, then the screens, then the editor.
 
-1. **`nui-link-list` trailing row action** — the one library gap §4 names. Small, generic, unblocks the
-   whole axis. Calibrates the CMS↔library loop before anything depends on it.
+1. **`nui-link-list` trailing row action** — **done 2026-09-25** (`nui_wc2` `ae947d6`). It was an
+   unfinished feature rather than a missing one; §4 records the correction. It earned its keep as the
+   calibration exercise: it exposed that the library's **docs and demos understate what the library can
+   do**, so §4 must be verified against the implementation before it is trusted.
 2. **The shell, and one screen end to end.** `nui-app` + `nui-sidebar` + `nui-link-list` as the axis,
    `nui-list` as the pane, against real data shapes. The **raw/JSON editor** is the first editing path
    because it is universal and unblocks every content type at once (§3).
@@ -283,7 +300,8 @@ Top-down: the pattern first, then the screens, then the editor.
 
 1. **Which editor opens, and when?** §3 records two editors over one document without the rule that
    selects between them. Verify against the live admin before designing.
-2. **`nui-link-list` row action** — generic slot at any depth, or rows-with-children only?
+2. **`nui-link-list` row action** — *resolved 2026-09-25*: generic, any item at any depth, with
+   `headerAction` kept as an alias. Recorded as a decision rather than left as a question.
 3. **Trash semantics** for entries and media — one trash, or per-collection?
 4. **Concurrency** — `m_date` optimistic locking on write (reject stale), or last-write-wins? An LLM
    client racing the admin UI is a real scenario.

@@ -145,29 +145,32 @@ the walkthrough: the work per screen is putting these two pieces together, not i
 `nui-list` already ships sorting, filtering, searching and its own image-lazyload throttle — that
 capability is inherited, not reimplemented per screen.
 
-## 6. The one gap found
+## 6. The row-action requirement — and what it turned out to be
 
-**`nui-link-list` cannot carry a trailing action on a row.**
+**Requirement:** a `nui-link-list` row must be able to carry a trailing control — a control, not
+navigation, that must not select or expand the row — so buckets and tables can be edited from the axis
+itself.
 
 Observed in the live old CMS: the **Database** row — a row that owns children — carries a **gear
 icon at its right edge**, on the same line as the label. Its children carry the leading chevron
 instead. The gear opens a **set-level editor** dialog (pencil + × per collection, plus an "add
 collection" field). Item-level editing does **not** live in the sidebar.
 
-The missing concept is therefore a **trailing control slot on a link-list row** that is a control,
-not navigation — clicking it must not select or expand the row. Needed so buckets and tables can be
-edited from the axis itself.
+This was first written up here as a **missing concept**. That was wrong. `nui-link-list` already rendered
+such a control declaratively (the Playground demonstrates it), and its data-driven builder already had a
+`headerAction` key for it — group-headers only, hardcoded icon and label, undocumented and unused. The gap
+was an **unfinished feature, not a missing one**, and only the implementation showed it: not the component
+doc, not the registry, not the demo.
+
+Shipped in `nui_wc2` `ae947d6`: `rowAction` on any item at any depth, string or `{action, icon, label}`,
+`headerAction` kept as an alias. Verified live in the Playground.
 
 ![Sidebar — gear on the Database row](reference/n000b_cms/screenshots/15-sidebar-row-action.png)
 
 ![Edit Collections dialog — set-level editing](reference/n000b_cms/screenshots/16-edit-collections.png)
 
-**Open question (undecided):**
-Should the trailing action be available on **any row at any nesting depth**, or only on **rows that
-have children**?
-
-- *Generic row slot* — the more useful primitive; covers the parent case and more.
-- *Container-only* — a narrower feature, but encodes "this row is a container" in the component.
+**Open question (resolved 2026-09-25):** the trailing action is **generic** — available on any row at any
+nesting depth, not restricted to rows with children.
 
 `nui-link-list` is otherwise more capable than the old sidebar: it already supports multiple
 nesting levels.
