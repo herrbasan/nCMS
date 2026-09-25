@@ -46,10 +46,30 @@ component touched (and its `docPath`). The authoritative shell reference is the 
 nui-app
 ├── nui-skip-links
 ├── nui-app-header → <header> with the sidebar toggle (data-action="toggle-sidebar") + <h1>
-├── nui-sidebar → the nui-link-list DIRECTLY (no <nav> wrapper: the list carries its own landmark)
+├── nui-sidebar → the nui-link-list DIRECTLY (no <nav> wrapper)
 ├── nui-content → nui-main
 └── nui-app-footer (optional)
 ```
+
+**Start from `modules/nui_wc2/nui-boilerplate/`** — it is the working base structure (`index.html`,
+`js/app.js`, `js/page-init.js`, `pages/`, `css/main.css`). Copy it and adapt; do not assemble a shell
+from component docs.
+
+Rules the source enforces that the docs do not state:
+
+- **`nui-sidebar` forces `mode="fold"` on its inner link list** when no mode is set. The sidebar's list
+  *is* the navigation and it is a fold list. Never set `mode="tree"` on it.
+- **The sidebar delegates the list API** (`setActive`, `getActive`, `getActiveData`, `clearActive`,
+  `clearSubs`). Drive the sidebar, not the inner `nui-link-list`.
+- **No navigation landmark is involved.** The list renders `role="tree"` and the sidebar adds none.
+  (`guides/accessibility.md` claims the list upgrades to `role="navigation"` — that role belongs to
+  `nui-skip-links`; the guide is wrong here.) So the `<nav>` wrapper is optional, not redundant.
+- **Navigation is routed.** `nui.setupRouter({ container: 'nui-content nui-main', navigation:
+  'nui-sidebar#nav-sidebar', basePath, defaultPage })`; nav items carry `href="#page=…"`/`#feature=…`
+  and the router calls `setActive` on every `nui-route-change`. Screens are `pages/*.html` fragments via
+  `nui.registerPage`, or `nui.registerFeature` for JS-built views — not one boot script.
+- `nui.js` is imported as a module (`import { nui } from '../../NUI/nui.js'`); the boilerplate also sets a
+  CSP meta with `'unsafe-eval'` and gates the shell with `nui-app:not(.nui-ready) { display: none }`.
 
 **Header slots carry app identity and global controls only.** Page state — the current scope, entry
 counts, filters — belongs in a page header inside the content area. Putting page state in the app header
