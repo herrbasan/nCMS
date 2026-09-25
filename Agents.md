@@ -20,6 +20,35 @@ Two-phase effort:
 > repo convention that every project root carries an `Agents.md`. When the folder is extracted into
 > its own project, this becomes that project's root briefing.
 
+## Running it (2026-09-25)
+
+```
+node server.js          # http://localhost:3300/   (PORT env overrides)
+```
+
+Zero dependencies: `node:http` for transport, nDB (submodule) in-process for storage. No
+`npm install`, no build step.
+
+| Path | What |
+|---|---|
+| `server.js` | routing, static serving, JSON API — glue only |
+| `lib/store.js` | storage. Collections are declared by `data/meta/data.jsonl`; each is a folder under `data/` whose `data.jsonl` *is* the nDB database |
+| `lib/http-error.js` | the error type carrying the wire contract |
+| `admin/` | the SPA — NUI shell (`nui-app` + `nui-sidebar`), `nui-link-list` as the scope axis, `nui-list` as the pane, `nui-code-editor` for raw document editing |
+| `data/` | content, not code — gitignored |
+
+API, with the envelope `{status:true,data}` / `{status:false,error,message,detail}`:
+
+| Method | Path |
+|---|---|
+| `GET` | `/api/collections` |
+| `GET` · `POST` | `/api/collections/:key/entries` |
+| `GET` · `PUT` · `DELETE` | `/api/collections/:key/entries/:id` |
+
+Deletion is nDB's tombstone **plus** its document trash (`_trash/docs/data.jsonl`): nothing is
+destroyed until the trash is emptied. `nDB`'s `trash_ttl` / `trash_purge_interval` options are the
+hook for making that a policy rather than a manual act.
+
 ## Layout
 
 - [docs/cms-migration-plan.md](docs/cms-migration-plan.md) — migration vision, invariants, plan (the living doc).

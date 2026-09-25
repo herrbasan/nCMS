@@ -1,0 +1,40 @@
+/* Layout for the admin. Only our OWN elements are styled here — NUI components carry their
+   own presentation, and reaching into them would fight the design system. */
+
+.admin-pane {
+	position: relative;
+	block-size: calc(100dvh - var(--app-header-height));
+}
+
+.admin-row {
+	display: flex;
+	align-items: center;
+	gap: var(--nui-space);
+	block-size: 100%;
+	padding-inline: var(--nui-space);
+}
+
+.admin-row-main {
+	flex: 1;
+	min-inline-size: 0;
+}
+
+.admin-row-title {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.admin-row-snippet {
+	font-size: var(--font-size-small);
+	color: var(--text-color-dim);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.admin-row-meta {
+	font-size: var(--font-size-small);
+	color: var(--text-color-dim);
+	white-space: nowrap;
+}

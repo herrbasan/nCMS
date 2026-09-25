@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="color-scheme" content="light dark">
+	<title>nCMS</title>
+
+	<!-- NUI theme + the two addons this screen uses. Addons need BOTH their JS and their CSS. -->
+	<link rel="stylesheet" href="/nui/css/nui-theme.css">
+	<link rel="stylesheet" href="/nui/css/modules/nui-list.css">
+	<link rel="stylesheet" href="/nui/css/modules/nui-code-editor.css">
+	<link rel="stylesheet" href="/admin/css/admin.css">
+
+	<script type="module" src="/nui/nui.js"></script>
+	<script type="module" src="/nui/lib/modules/nui-list.js"></script>
+	<script type="module" src="/nui/lib/modules/nui-code-editor.js"></script>
+</head>
+<body>
+	<nui-app>
+		<nui-skip-links></nui-skip-links>
+
+		<nui-app-header>
+			<header>
+				<div slot="left">nCMS</div>
+				<div slot="center" id="scope"></div>
+				<div slot="right"><span id="count"></span></div>
+			</header>
+		</nui-app-header>
+
+		<nui-sidebar behavior="primary">
+			<nav>
+				<nui-link-list id="axis" mode="tree"></nui-link-list>
+			</nav>
+		</nui-sidebar>
+
+		<nui-content>
+			<main>
+				<div class="admin-pane" id="pane"></div>
+			</main>
+		</nui-content>
+	</nui-app>
+
+	<script type="module" src="/admin/js/app.js"></script>
+</body>
+</html>
