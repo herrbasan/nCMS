@@ -1,9 +1,38 @@
 /* Layout for the admin. Only our OWN elements are styled here — NUI components carry their
-   own presentation, and reaching into them would fight the design system. */
+   own presentation, and reaching into them would fight the design system. Theme variables only. */
 
+/* Hold the shell back until the layout engine has measured itself, which is what the
+   Playground does to prevent a visible re-flow on load. A state gate, not styling. */
+nui-app:not(.nui-ready) {
+	display: none;
+}
+
+.admin-shell {
+	display: flex;
+	flex-direction: column;
+	block-size: 100%;
+}
+
+.admin-page-header {
+	padding: var(--nui-space-double) var(--nui-space) var(--nui-space);
+}
+
+.admin-page-header h1 {
+	margin: 0;
+}
+
+.admin-page-meta {
+	margin: 0;
+	color: var(--text-color-dim);
+	font-size: var(--font-size-small);
+}
+
+/* nui-list fills its container via absolute positioning, so the container needs
+   position: relative and a definite height. */
 .admin-pane {
 	position: relative;
-	block-size: calc(100dvh - var(--app-header-height));
+	flex: 1;
+	min-block-size: 0;
 }
 
 .admin-row {

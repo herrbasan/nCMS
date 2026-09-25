@@ -17,27 +17,42 @@
 	<script type="module" src="/nui/lib/modules/nui-code-editor.js"></script>
 </head>
 <body>
-	<nui-app>
+	<!-- Immediate children of nui-app, in order. The header carries app identity and global
+	     controls; the current scope belongs to the page, not to the shell. -->
+	<nui-app content-min-width="60rem">
 		<nui-skip-links></nui-skip-links>
 
 		<nui-app-header>
 			<header>
-				<div slot="left">nCMS</div>
-				<div slot="center" id="scope"></div>
-				<div slot="right"><span id="count"></span></div>
+				<div slot="left">
+					<nui-button data-action="toggle-sidebar" variant="icon">
+						<button type="button" aria-label="Toggle navigation">
+							<nui-icon name="menu"></nui-icon>
+						</button>
+					</nui-button>
+					<h1>nCMS</h1>
+				</div>
+				<div slot="center"></div>
+				<div slot="right"></div>
 			</header>
 		</nui-app-header>
 
+		<!-- The sidebar's inner element is the link list itself: it carries its own navigation
+		     landmark, so a <nav> wrapper would nest a second one. -->
 		<nui-sidebar behavior="primary">
-			<nav>
-				<nui-link-list id="axis" mode="tree"></nui-link-list>
-			</nav>
+			<nui-link-list id="axis" mode="tree" aria-label="Collections"></nui-link-list>
 		</nui-sidebar>
 
 		<nui-content>
-			<main>
-				<div class="admin-pane" id="pane"></div>
-			</main>
+			<nui-main>
+				<div class="admin-shell">
+					<header class="admin-page-header">
+						<h1 id="scope"></h1>
+						<p class="admin-page-meta" id="count"></p>
+					</header>
+					<div class="admin-pane" id="pane"></div>
+				</div>
+			</nui-main>
 		</nui-content>
 	</nui-app>
 
