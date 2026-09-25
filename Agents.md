@@ -37,6 +37,24 @@ Zero dependencies: `node:http` for transport, nDB (submodule) in-process for sto
 | `admin/` | the SPA — NUI shell (`nui-app` + `nui-sidebar`), `nui-link-list` as the scope axis, `nui-list` as the pane, `nui-code-editor` for raw document editing |
 | `data/` | content, not code — gitignored |
 
+**NUI fluency — read this before writing any admin code.** In order: `documentation/DOCUMENTATION.md`,
+then every file in `documentation/guides/`, then the entry in `documentation/components.json` for each
+component touched (and its `docPath`). The authoritative shell reference is the library's own
+**`Playground/index.html`**:
+
+```
+nui-app
+├── nui-skip-links
+├── nui-app-header → <header> with the sidebar toggle (data-action="toggle-sidebar") + <h1>
+├── nui-sidebar → the nui-link-list DIRECTLY (no <nav> wrapper: the list carries its own landmark)
+├── nui-content → nui-main
+└── nui-app-footer (optional)
+```
+
+**Header slots carry app identity and global controls only.** Page state — the current scope, entry
+counts, filters — belongs in a page header inside the content area. Putting page state in the app header
+is a mistake this repo has already made once.
+
 API, with the envelope `{status:true,data}` / `{status:false,error,message,detail}`:
 
 | Method | Path |
