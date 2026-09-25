@@ -170,12 +170,20 @@ form-level validation container. None of these block the pattern; they shape §1
 - **Mostly schemaless entries.** A few fields every dataset needs; the rest is open JSON. Schema is
   defined **per table and optional** — a *view contract*, not a storage constraint, so it can change
   without migrating rows.
-- **Buckets, collections and tables are labels, not directories.** One pool; membership is a field on the
-  item. Creating or deleting one moves no bytes — it is an edit to membership metadata. The "filesystem"
-  appearance is a view.
-- **Deletion is two-stage.** Unlink → **trash** (item fully present, restorable) → purge (the **only**
-  irreversible act). "Delete" in the first sense must never be what reclaims storage, or the distinction
-  and its safety net collapse.
+- **Buckets are labels, not directories.** One media pool; membership is a field on the item. Creating or
+  deleting a bucket moves no bytes — it is an edit to membership metadata. The "filesystem" appearance is a
+  view. nDB expresses this with file buckets plus its own bucket trash (`_trash/files/`).
+- **Collections are separate document stores, not labels in one pool.** *Corrected 2026-09-25 while building
+  build-order step 2:* an earlier draft of this section lumped collections in with buckets. They are not the
+  same mechanism. The old CMS kept one file per collection, and the implementation keeps one nDB database
+  folder per collection (`data/<key>/data.jsonl`), with `data/meta/data.jsonl` declaring which exist. That
+  declaration is load-bearing: `Database.open()` **creates** a database it cannot find, so membership must
+  be checked before opening or a typo'd key would silently bring a collection into existence.
+- **Deletion is two-stage, and the stages mean different things.** Unlink → **trash** (item fully present,
+  restorable) → purge (the **only** irreversible act). "Delete" in the first sense must never be what
+  reclaims storage, or the distinction and its safety net collapse. **nDB provides this natively:** `delete()`
+  tombstones the record and archives the full document to `_trash/docs/data.jsonl`, `restore(id)` brings it
+  back, and `trash_ttl` / `trash_purge_interval` are the hook for making the purge a policy.
 - **Considered, not committed:** auto-tiering trashed data to cold storage. If built, purge becomes a
   *policy* rather than a user action, and **restore must work from cold** — otherwise trash is a lie.
 - **nDB API caveat (verified in v1):** only *loosely* modelled on neDB. **No cursor chaining** — no lazy
@@ -270,9 +278,15 @@ Top-down: the pattern first, then the screens, then the editor.
    unfinished feature rather than a missing one; §4 records the correction. It earned its keep as the
    calibration exercise: it exposed that the library's **docs and demos understate what the library can
    do**, so §4 must be verified against the implementation before it is trusted.
-2. **The shell, and one screen end to end.** `nui-app` + `nui-sidebar` + `nui-link-list` as the axis,
-   `nui-list` as the pane, against real data shapes. The **raw/JSON editor** is the first editing path
-   because it is universal and unblocks every content type at once (§3).
+2. **The shell, and one screen end to end** — **done 2026-09-25** (`98fcf91`). `node server.js`, zero
+   dependencies: `node:http` + nDB in-process. The axis is `nui-link-list`, the pane is `nui-list`, and the
+   **raw/JSON editor** (`nui-code-editor` in a `nui-dialog`) was the first editing path, as planned — it
+   makes every content type editable at once. Verified create → edit → save → delete against real MD-Blocks
+   data, with the write landing as an append-only record and the delete as a tombstone plus a copy in nDB's
+   own trash.
+   *What it proved:* the pattern composes. A screen needed no new interaction design — only a choice of scope
+   axis and a row renderer. *What it cost:* one runtime bug (teardown called `cleanUp()` before `remove()`,
+   and disconnection calls it again) that the screen never showed — found in the console log, not the UI.
 3. **Remaining screens** — the other scope axes (files/buckets, tables, trash) and their create/edit/delete
    axis actions. Each is a composition, not a design.
 4. **The media surface** — upload, job progress via SSE, reprocess, failure surfacing.
