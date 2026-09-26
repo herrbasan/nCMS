@@ -35,6 +35,7 @@ Zero dependencies: `node:http` for transport, nDB (submodule) in-process for sto
 | `lib/store.js` | storage. Collections are declared by `data/meta/data.jsonl`; each is a folder under `data/` whose `data.jsonl` *is* the nDB database |
 | `lib/http-error.js` | the error type carrying the wire contract |
 | `admin/` | the SPA — NUI shell (`nui-app` + `nui-sidebar`), `nui-link-list` as the scope axis, `nui-list` as the pane, `nui-code-editor` for raw document editing |
+| `tools/import-n000b.js` | one-shot migration of the old CMS's block tree into MD-Blocks entries — a client of the HTTP API, not a second writer. `--out <dir>` writes previews instead of importing, so the output can be checked with `modules/md-blocks/tools/validate.js` |
 | `data/` | content, not code — gitignored |
 
 **NUI fluency — read this before writing any admin code.** In order: `documentation/DOCUMENTATION.md`,

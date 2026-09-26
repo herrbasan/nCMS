@@ -201,7 +201,36 @@ form-level validation container. None of these block the pattern; they shape §1
   `findWhere(field, predicate)`, `findRange(field, min, max)`. Combinators (`$and`, `$or`, `$gte`…) live
   inside the AST. The storage-adapter seam is **5 Promise-returning methods per collection**:
   `getDocs(options)`, `getDoc(options)`, `add(data)`, `update(options, data)`, `delete(id)`.
-- **Data movement:** one-shot neDB JSONL → nDB import, `_id` preserved.
+- **Data movement: `tools/import-n000b.js` — done 2026-09-26.** One-shot and zero-dependency, and a
+  **client of the HTTP API** (`POST /api/collections`, `POST /api/collections/:key/entries`) rather than a
+  second writer of `data.jsonl` — a second write path would be a second set of rules about what an entry is.
+  The whole `works` collection migrated: 142 documents into a new `works-n000b` collection, which is now the
+  admin's real content. What the mapping had to decide:
+  - The old **fixed header** section is not content — `variables` → frontmatter (`title`, `customer`, `agency`,
+    `year`, `location`, `categories`), the `Cover` media block → `cover:`, and the numeric `Involvement` fields
+    → `involvement:`. Category ids resolve through the old categories collection.
+  - **`richtext` is HTML, and pair-matching is not enough.** The editor emitted
+    `<p><h1>…</h1><p>…</p></p>`, and a heading cannot nest inside a paragraph — a pair-matching replace leaves
+    a stray `<p>` behind. The converter walks tags instead and closes the open block where the next one opens,
+    which is what a browser does with that input. Measured across the corpus the markup is only
+    `h1`/`h2`/`p`/`br`, with no attributes and no entities; anything else throws rather than being guessed at.
+  - **A column's single block is hoisted onto the `mb:col` marker** — the shape the demo corpus uses (`preset`
+    /`label` on the column, Markdown inside). 248 of the 251 columns hold exactly one block; only the other 3
+    need explicit blocks inside a column.
+  - **References are `media/<media _id>/<filename>`** — by pool id, matching the step-2 fixture. No bytes
+    move: **the old media pool is not migrated yet**, so every image and audio reference is currently
+    dangling. §11.4 is the fix.
+  - **Nothing is dropped silently.** `class` (104 values) and `parent_name` (258) have no MD-Blocks
+    equivalent (presentation lives in presets); both are counted and reported in the run output.
+  - **Verified against the spec, not by eye.** All 142 documents were written as previews (`--out`) and run
+    through `modules/md-blocks/tools/validate.js`: 139 clean, and the 3 failures are a **validator** defect
+    rather than a format one — blocks inside columns, which spec §4.3 permits and the validator's flat `mode`
+    variable cannot represent. Filed as md-blocks #4.
+  - **Not carried across:** the old `FDAR *` composite names survive as `label`s, but the new system's answer
+    to a composite is a preset; and a video's poster is not re-linked, because the old data keeps the poster
+    as a separate pool item with no reference from the video.
+  - **`_id` is not preserved.** nDB generates the entry id; the old one is kept as `n000b_id` so an imported
+    entry can always be traced back to its source.
 
 ## 6. Media
 
@@ -353,6 +382,9 @@ Top-down: the pattern first, then the screens, then the editor.
      clearing its name).
    - Remaining: **Files/buckets** (waits on the media surface, §11.4), **Trash** (restore/purge over the
      tombstones this step creates), **Server Info** and **Live Log** (fixed tooling).
+   - **The screens now have real content.** `works-n000b` holds 142 documents migrated from the old CMS
+     (§5), so a screen is exercised against the old site's actual shape — its real section counts, its real
+     columns, its genuinely malformed documents — rather than against fixtures.
    - **Not the axis's jobs after all:** the completion banner the first build showed on every save is gone.
      The axis and the list are the feedback; a notification is reserved for failures, which is the one thing
      the DOM cannot show on its own.
