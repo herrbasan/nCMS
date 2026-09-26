@@ -239,12 +239,30 @@ function buildCollectionRow(collection) {
 	return row;
 }
 
+const collectionUrl = (key) => `/api/collections/${encodeURIComponent(key)}`;
+
+// A defined collection keeps its language set in `cms.languages`; only legacy collections keep one in
+// the registry. The editor reads whichever is authoritative and never holds a second copy of it.
+// One request per collection: the list endpoint deliberately does not carry definitions, because
+// most screens do not need them.
+async function readCollections() {
+	const collections = await api('GET', '/api/collections');
+	return Promise.all(collections.map(async (collection) => {
+		const definition = await api('GET', `${collectionUrl(collection.key)}/definition`);
+		return {
+			...collection,
+			definition,
+			languages: definition ? definition.languages : (collection.translatability ?? [])
+		};
+	}));
+}
+
 // `state` carries the form across a rejected save, the same way the raw editor carries the
 // author's text — a validation failure must never cost them the edit.
 async function openCollectionsEditor(state) {
-	const original = state?.original ?? await api('GET', '/api/collections');
+	const original = state?.original ?? await readCollections();
 	const rowsState = state?.rows ?? original.map((c) => ({
-		key: c.key, name: c.name, languages: c.translatability
+		key: c.key, name: c.name, languages: c.languages
 	}));
 
 	const { main, result } = await nui.components.dialog.page('Collections', '', {
@@ -291,22 +309,35 @@ async function openCollectionsEditor(state) {
 	const renames = rowsNow.filter((row) => {
 		const before = original.find((c) => c.key === row.key);
 		return before && (before.name !== row.name
-			|| JSON.stringify(before.translatability) !== JSON.stringify(row.languages));
+			|| JSON.stringify(before.languages) !== JSON.stringify(row.languages));
 	});
 
 	try {
 		for (const collection of deletions) {
-			await api('DELETE', `/api/collections/${encodeURIComponent(collection.key)}`);
+			await api('DELETE', collectionUrl(collection.key));
 		}
 		for (const row of additions) {
-			await api('POST', '/api/collections', { name: row.name, translatability: row.languages });
+			// A collection created here carries a definition, so its languages live in one place from
+			// the start rather than being copied into the registry as well.
+			await api('POST', '/api/collections', { name: row.name, definition: { languages: row.languages } });
 		}
 		for (const row of renames) {
-			await api('PATCH', `/api/collections/${encodeURIComponent(row.key)}`,
-				{ name: row.name, translatability: row.languages });
+			const before = original.find((c) => c.key === row.key);
+			// The definition is written first: it is the change that can be refused, and a refusal must
+			// not leave a rename already applied.
+			if (JSON.stringify(before.languages) !== JSON.stringify(row.languages)) {
+				if (before.definition) {
+					await api('PUT', `${collectionUrl(row.key)}/definition`,
+						{ ...before.definition, languages: row.languages });
+				} else {
+					await api('PATCH', collectionUrl(row.key), { translatability: row.languages });
+				}
+			}
+			if (before.name !== row.name) await api('PATCH', collectionUrl(row.key), { name: row.name });
 		}
 	} catch (error) {
-		// A boundary failure (a colliding key, the server down). Surface it and keep the form.
+		// A boundary failure (a colliding key, the server down) or a **refused definition change**.
+		// Surface it and keep the form, so the edit is not lost.
 		notify(`Not saved — ${error.message}`, 'alert');
 		return openCollectionsEditor({ rows: rowsNow, original });
 	}

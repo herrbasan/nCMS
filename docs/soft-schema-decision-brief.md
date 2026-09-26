@@ -236,25 +236,27 @@ harmless:
   explicit* operation, and compaction only reclaims the log history that removal leaves behind. Deleting a
   declaration must never imply deleting data.
 
-**Minimal first implementation — one rule, applied to every change:**
+**Implemented and verified — one rule, judged only from what is declared:**
 
-> **A definition change never rewrites or coerces a value, and applies only if every existing value stays
-> readable under the new definition.** Otherwise it is refused *in whole*, with a machine-readable account of
-> what conflicts. Explicit conversion is a separate feature and **not built now** — but its input is the refusal
-> payload, so the deferral is not a dead end.
+> **A declaration may only appear or change for a field that holds no values yet.** Otherwise the change is
+> refused *in whole*, with a machine-readable account of what conflicts. Explicit conversion is a separate
+> feature and **not built now** — but its input is the refusal payload, so the deferral is not a dead end.
 
-**"Readable" is the whole test, and it is what makes *conversion* the right word.** A change that would require
-one value to become another is conversion even when the target is uniquely derivable — cardinality is
-irrelevant, and the absence of ambiguity does not make it free.
+**A value is never inspected to decide what it *is*.** A shared field may legitimately hold `{en: 5, de: 7}`
+meaning something else entirely, and no amount of looking can tell that from a language map. So there is no
+readability test — the only judgement available is the declaration itself. The consequence is deliberate and
+worth stating plainly: **conversion is required for anything already written**, including a single-language
+value that would merely need wrapping.
 
 | change | verdict |
 |---|---|
-| add or re-add a declared field | **applies** only if the values already present for it — free JSON from raw editing, or left by an earlier retirement — are readable under the declared kind. A string where a per-language map is expected is **not**. Reports coverage either way |
-| change the display field | **applies** — values are untouched and still readable; only the projection moves. Reports which entries would show blank |
+| add or re-add a declared field, for a field with no values | **applies**; reports coverage |
+| add or re-add a declared field, for a field that already holds values — declared or free JSON | **refused**, `declaration_over_values`: its kind was never declared, so it cannot be judged |
+| change the display field | **applies** — values are untouched, only the projection moves. Reports which entries would show blank |
 | add a language | **applies** — every existing value reads the same. Reports how many entries have no variant in it |
-| remove a language | **refused** if *any* entry has content in it — a document variant in that language, **or** a per-language fact value. It becomes unreadable, which is the test |
-| retire a declared field | **applies**, and touches no data: the field becomes undeclared free JSON, which the invariant already permits as preserved-but-uninterpreted |
-| `shared → per-language` or `per-language → shared` | **refused** if *any* entry holds a value in that field. No cardinality exception |
+| remove a language | **refused** if *any* entry has content in it — a document variant, or a value under a declared per-language field — `language_in_use` |
+| retire a declared field | **applies**, and touches no data: the field becomes undeclared free JSON |
+| `shared ↔ per-language` on a field holding values | **refused**, `declaration_over_values`. No cardinality exception |
 | coverage gaps | never a conflict; reported, never refused |
 
 Three invariants, and they are what make "soft" safe:
@@ -493,13 +495,14 @@ D6 rule 5, and the document/record cut → D8.)*
 2. **D3 versus the set-editor already shipped.** It writes definitions over HTTP today. If D3(b) holds, part of
    that UI has to become a reviewed, previewed change rather than a Save.
 3. **The definition's own drift.** A declaration in `meta.json` is a *second* copy of a shape that also exists
-   in code (`titleOf`, the admin's row renderer, the importer's mapping). If it is not the only source, it
-   becomes a third thing to keep in sync — the failure mode `titleOf` already demonstrates.
-4. **No authority has been chosen for a value that currently lives in two places.** D6 rule 2 says a declared
-   fact may not also be authoritative in frontmatter — but the 142 imported documents *do* carry their facts
-   there, and `writing`'s variants carry `title` there. The rule needs a migration, and the migration needs a
-   rule for when the two disagree. That is D3a's ambiguous case arriving before any definition exists to
-   change.
+   in code (the admin's row renderer, the importer's mapping, the definition-change rule itself). Languages are
+   now single-authority for defined collections, so the remaining risk is the *field* vocabulary being
+   described in more than one place.
+4. **Partly settled, partly open: values that live in two places.** The *language set* is settled — for a
+   defined collection `cms.languages` is the authority and the registry holds no copy. What remains is D6 rule
+   2: the 142 imported documents carry their facts in document frontmatter, which is a second authority beside
+   `facts`, and the rule needs a migration and a rule for when the two disagree. That is D3a's case arriving
+   before any definition exists to change.
 5. **D7's favourite is a judgement, not a measurement.** (b) is preferred for refcounted GC and dedup, but the
    variant cache's predictable paths are a real serving advantage for (a). If serving paths matter more than
    orphan cleanup, the choice flips.
@@ -619,3 +622,19 @@ Four things this shape asserts, each following from a decision above:
 
 The payoff in one line: **the renderer needs the definition and one entry, and reads every value by path. No
 heuristic anywhere.** That is what `titleOf` was standing in for.
+
+### Added: structural enforcement on entry writes
+
+With a definition present, entry saves are checked against the declared **shape** — which languages a
+per-language value and a document variant may be keyed by, and the body policy (`required | optional | none`).
+A shared field's value is unchecked, because it may be arbitrary JSON. Missing translations stay allowed:
+a variant that does not exist is "no URL" (B2), not an error. Refusals are `400 invalid_entry` with
+`detail.problems`, naming the field and the code.
+
+### Added: two behaviours worth knowing
+
+- **nDB returns object keys sorted.** A shared object written as `{en: …, de: …}` reads back as
+  `{de: …, en: …}`. Semantically identical, but any comparison of stored objects must be by value, and the raw
+  editor will show keys in a different order than they were typed.
+- **A defined collection's label comes from the declared display field**, taking the first declared language
+  that holds a value for a per-language field. A legacy collection keeps the old heuristic unchanged.

@@ -91,9 +91,21 @@ API, with the envelope `{status:true,data}` / `{status:false,error,message,detai
 A collection's **definition** — languages, body policy, display field, per-field kind — lives in that
 collection's own `meta.json` under a `cms` key, beside nDB's own keys, which are preserved untouched
 (brief D1). nDB's `schemas` key in the same file is a different contract and is inert. `PUT` applies the
-**D3a rule**: a change never rewrites or coerces a value and applies only if every existing value stays
-readable under the new definition — otherwise it is refused in whole with `409 definition_conflict` and a
+**D3a rule**: a declaration may only appear or change for a field that holds no values yet — a value is never
+inspected to decide what it is — otherwise the change is refused in whole with `409 definition_conflict` and a
 `detail.conflicts` list of entry ids, fields and codes. Nothing else in this file writes that key.
+
+- **When a definition is present, it is the authority**: `cms.languages` supersedes the registry's
+  `translatability`, and a collection created with a definition gets **no** registry language list. The admin
+  reads the definition for those collections and the registry for legacy ones, and holds no second copy. A
+  collection with no definition behaves exactly as before.
+- **Entry saves are checked against the declared shape** (`400 invalid_entry`, `detail.problems`): a
+  per-language value and a document variant may only be keyed by declared languages, and the body policy
+  (`required | optional | none`) is enforced. A shared value is unchecked — it may be arbitrary JSON — and a
+  missing translation is always allowed.
+- **A defined collection's list label comes from its declared `display` field**, never from a guess; legacy
+  collections keep the old heuristic. nDB returns object keys sorted, so stored objects must be compared by
+  value rather than by string.
 
 A collection is a declaration in `data/meta/data.jsonl` plus a folder of its own. The declaration
 is load-bearing: `Database.open()` **creates** a database it cannot find, so membership is checked
