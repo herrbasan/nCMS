@@ -409,11 +409,28 @@ for reliable media-record *replacement*. Treat it as a dependency of (b), not as
 should not hand-roll. It is close: (a) carries no dependency on nDB's GC or on its write ordering, and wins if
 the variant cache's predictable paths matter to serving. **Still a proposal — not agreed.**
 
+**What the first media pass actually built (2026-09-26), and why it does not decide this.** It splits the
+question rather than answering it as posed: the **bytes** are a CMS-side filesystem pool
+(`data/media/pool/<assetId>/`) and the **index** — asset records and buckets — is two local nDB databases.
+That is a third shape, not (a) or (b), and it was chosen for a specific reason: the reference is
+`media/<assetId>/<filename>` and resolves by **asset id**, so *where the bytes live is reversible* — moving
+them later changes no reference and no entry. The reference form is the part that had to be right now; the
+storage beneath it can still go either way.
+
+**Does it depend on nDB #7?** Not as built. #7 bites when the **bytes are nDB-tracked blobs**, because an
+update can trash a blob before its journal write lands. Here the bytes are outside nDB, and the index update
+is *additive* — a completed variant is added, and an existing one is replaced only once its replacement is on
+disk — so no write ever removes a working variant's only reference. Moving the pool *into* nDB buckets would
+make #7 matter, which is the strongest argument for leaving it where it is.
+
 *Weak evidence, flagged:* zero media files are shared between two collections in the whole archive (561 in
 `works`, 79 in `audio_player`; the overlap is `works` with its own trash). That describes the archive, **not
 what a general-purpose CMS should permit**.
 
-- **D7a:** does `bucket` survive as a label on the media record, or is it dropped?
+- **D7a — settled by the first media pass:** `bucket` survives **as a label on the asset record**, which is what
+  "buckets are labels, not directories" meant all along. Moving an asset between buckets edits that label
+  only: no bytes move, the id is unchanged, and no reference changes — because a reference names the asset,
+  never the bucket.
 - **D7b:** does the **renderer** resolve variants at build time, or does the CMS pre-resolve? Still the real
   question — and (b) makes resolution *more* explicitly the CMS's job, not less.
 

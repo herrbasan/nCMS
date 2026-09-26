@@ -278,13 +278,46 @@ form-level validation container. None of these block the pattern; they shape §1
 
 ## 6. Media
 
+**What nMedia actually offers — measured 2026-09-26** (`http://192.168.0.100:3500`, from its own
+`documentation/CAPABILITIES.md` + `PROCESSING.md` and a probe of the live service):
+
+- `POST /v1/upload` takes a **raw binary** body and returns a `fileId`; `POST /v1/process` takes
+  `{fileId, processor, mode?, options}` and returns a `jobId` immediately. Job state is
+  `queued | processing | completed | failed | cancelled`, with an `error` when it fails and an `assetId` when
+  it completes; the result is fetched from `GET /v1/assets/:id`.
+- **One job produces one output.** The **variant menu is therefore N jobs against one upload**, not one call
+  — which works because `markUploadProcessed` *extends* an upload's lifetime rather than consuming it.
+- **Its asset store is a cache, not a pool of record**: `cacheTtl` is 3600s, `cacheMaxSize` 10 GB. A result not
+  taken promptly is simply gone. This is the concrete reason the CMS owns the stored results.
+- It is **not on this machine**, and its vocabulary is its own: nothing in nMedia knows `big_avif`,
+  `thumb_cms` or `media_post`. The menu names are **ours**; the CMS maps each to one job.
+- Live health is `degraded` — `image: ready`, `audio: error`, `video: error`. Only images have a working
+  processor today, which is why only images have a variant menu.
+
+**Where the pool lives — a recommendation, not a settled decision.** Bytes go on the filesystem under one root
+(`data/media/pool/<assetId>/`), and the **index** — asset records and buckets — goes in two local nDB
+databases. That split is recommended because the pool needs a stable id per asset, many variants per asset
+under predictable names, and one root outside every collection, none of which nDB buckets provide (they are
+per-database, hash-named, one blob per hash). The choice is **reversible at the pool layer**: the reference is
+`media/<assetId>/<filename>` and resolves by **asset id**, so moving the bytes later changes no reference and
+no entry.
+
+**Does it depend on nDB #7?** Not as built. #7 is about an *update* trashing referenced media before its
+journal write lands, which bites when the **bytes are nDB-tracked blobs**. Here the bytes are outside nDB and
+the index update is *additive* — a completed variant is added, and an existing one is replaced only once its
+replacement is on disk — so no write ever removes a working variant's only reference. #7 would matter if the
+pool moved into nDB buckets, where a failed index write could strand the blobs it had already trashed.
+
 - **A document never stores media bytes — it stores a reference** (`_id` + metadata). Variant expansion
-  happens at render. This is what keeps entries lean and the list payload small.
+  happens at render. This is what keeps entries lean and the list payload small. The reference is
+  `media/<assetId>/<filename>`, resolved by asset id.
 - **The variant menu is an invariant:** `big/medium/thumb` in avif/webp/jpg + `thumb_cms`, plus ffmpeg
-  frames for video (`mp4_snap_*.png`), served from the cache layout. *Who computes it* is nMedia's job.
+  frames for video (`mp4_snap_*.png`), served from the cache layout. *Who computes it* is nMedia's job;
+  *what the menu is* is ours.
 - **nMedia computes; the CMS orchestrates.** Upload → job → variants; the backend owns job state, cache
   writes and pool bookkeeping. **nMedia never touches the pool directly.**
-- **Never start or restart nMedia from CMS code.** If `/health` fails, surface it in the admin.
+- **Never start or restart nMedia from CMS code.** If `/health` fails, surface it in the admin — the media
+  screen reads it, and a failed job keeps the processor's own message.
 - Upload is asynchronous by contract: it returns a **job** immediately; progress comes from SSE and
   polling. No request blocks on nMedia.
 

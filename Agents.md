@@ -38,6 +38,8 @@ Zero dependencies: `node:http` for transport, nDB (submodule) in-process for sto
 | `tools/import-n000b.js` | one-shot migration of the old CMS's block tree into MD-Blocks entries — a client of the HTTP API, not a second writer. `--out <dir>` writes previews instead of importing, so the output can be checked with `modules/md-blocks/tools/validate.js` |
 | `tools/probe-ndb.js` | checks the nDB behaviour the design decisions rest on (inert `schemas`, bucket scoping, `close()` and the folder lock, no cross-database read). A drift detector, not a test suite — it is expected to flip when the pin moves |
 | `tools/test-model.js` | end-to-end proof of the proposed data model in its own `model-test` collection: definition in `meta.json`, one bilingual entry with shared/per-language facts and whole MD-Blocks documents, save + reopen + raw-edit, and refusals that leave data unchanged. Needs the server running |
+| `tools/test-media.js` | one real upload-to-processed-media path: uploads a real image, waits for the whole variant menu, checks every variant is servable, that a bucket move keeps the reference, and that reprocessing does not discard working variants. Needs the server running **and nMedia reachable** |
+| `tools/test-media-failure.js` | fault injection for the failure path, which a healthy image job never exercises: makes nMedia unreachable then reachable again, proving a failure is recorded with its reason, a failed retry is recorded rather than thrown away, and the retry then succeeds. **Run with the server stopped** — it is a second writer on the same nDB files |
 | `data/` | content, not code — gitignored |
 
 **NUI fluency — read this before writing any admin code.** In order: `documentation/DOCUMENTATION.md`,
@@ -79,6 +81,23 @@ counts, filters — belongs in a page header inside the content area. Putting pa
 is a mistake this repo has already made once.
 
 API, with the envelope `{status:true,data}` / `{status:false,error,message,detail}`:
+
+| Method | Path |
+|---|---|
+| `GET` | `/api/nmedia` |
+| `GET` · `POST` | `/api/buckets` |
+| `PATCH` · `DELETE` | `/api/buckets/:id` |
+| `GET` · `POST` | `/api/media` (list takes `?bucket=`; POST is a raw binary body with `X-Filename` and `X-Bucket`) |
+| `GET` · `PATCH` · `DELETE` | `/api/media/:id` |
+| `POST` | `/api/media/:id/reprocess` · `/api/media/:id/restore` |
+| `GET` | `/api/media/:id/file/:name` (`:name` is a variant name or `original`) |
+
+Media is the **shared pool**: bytes on the filesystem under `data/media/pool/<assetId>/`, and the index —
+asset records and buckets — in two nDB databases under `data/media/`. The authoring reference is
+**`media/<assetId>/<filename>`** and resolves by **asset id**, which is what makes a bucket a *label*: moving
+an asset between buckets edits that label only, and renaming or re-filing never invalidates a reference.
+`lib/media.js` owns uploads, the variant menu, the nMedia client and the job driver; nMedia itself is never
+started or restarted from here. See plan §6 and the brief's D7 for why the bytes sit outside nDB.
 
 | Method | Path |
 |---|---|

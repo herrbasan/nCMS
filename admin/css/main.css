@@ -57,6 +57,63 @@
 	font-style: italic;
 }
 
+/* Media rows: a preview, then the label and its processing state. */
+.cms-thumb {
+	inline-size: 2.5rem;
+	block-size: 2.5rem;
+	object-fit: cover;
+	border-radius: var(--border-radius1);
+	background: var(--color-shade3);
+	flex: 0 0 auto;
+}
+
+.cms-thumb-broken {
+	visibility: hidden;
+}
+
+.cms-status-ok { color: var(--text-color-dim); }
+.cms-status-busy { color: var(--color-highlight); }
+.cms-status-bad { color: var(--color-danger, var(--color-highlight)); font-weight: 600; }
+.cms-status-dim { color: var(--text-color-dim); font-style: italic; }
+
+.cms-media-detail {
+	display: flex;
+	flex-direction: column;
+	gap: var(--nui-space);
+}
+
+.cms-field-reference {
+	font-family: var(--font-family-mono, monospace);
+	font-size: var(--font-size-small);
+}
+
+/* The variant menu: one cell per variant, each carrying its own job state so a failure names itself. */
+.cms-variants {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+	gap: var(--nui-space);
+}
+
+.cms-variant {
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--nui-space-half);
+}
+
+.cms-variant img {
+	inline-size: 100%;
+	block-size: 6rem;
+	object-fit: contain;
+	background: var(--color-shade3);
+	border-radius: var(--border-radius1);
+}
+
+.cms-variant figcaption {
+	font-size: var(--font-size-small);
+	word-break: break-word;
+}
+
 .cms-row-snippet {
 	overflow: hidden;
 	text-overflow: ellipsis;
