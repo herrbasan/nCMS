@@ -177,17 +177,30 @@ Proposed, as the minimum that removes an existing guess or ambiguity:
 *Open within D4:* does the definition govern only entry-level fields, or document frontmatter too? Position:
 document frontmatter **is** language (see D5), so it is not schema'd.
 
-### D5 — Shared facts vs language
+### D5 — Shared facts vs language (**refined 2026-09-26 by David's raum.com answer**)
 
-- **(a) Facts once on the entry; language as whole documents.** Facts (customer, agency, year, date,
-  taxonomy refs, media refs, involvement) live once and a variant *cannot* hold them. The body stays a
-  complete MD-Blocks document per language.
-- (b) The old CMS's shape, taken all the way: shared structure with maps only where values vary.
+raum.com shares **images** between both language versions, but the **audio** (the TTS-rendered article) is
+**per language**. That names a third class, and the model is not shared-vs-local but **three kinds of
+value**:
 
-**Proposed: (a).** Prose is not a value — a translated document legitimately differs in length, section count
-and media, and MD-Blocks is a document format; putting a language dimension at every node would infect the
-format to buy structural parity we could not honestly promise. Duplication of *facts*, by contrast, is pure
-drift risk with no compensating value.
+1. **shared value** — one value for the entry: `customer`, `agency`, `year`, `date`, taxonomy refs, images
+   and the cover, `involvement`.
+2. **per-language value** — **one slot, a value per language**: `audio` (`{en: <ref>, de: <ref>}`), and
+   `title`, which is *already* in this class in the existing data (`Hallo nCMS` / `Hello nCMS`).
+3. **language content** — the body, a complete MD-Blocks document per language.
+
+Class 2 is the old CMS's `lang: {de, en}` map — the shape we could only ever observe on one category label,
+because no multilingual content table existed. It was right, and right at this granularity: a **slot** with
+per-language values, not a duplicated record.
+
+**Proposed:** class 1 lives once on the entry; class 2 is a language map **on the entry**
+(`audio: {en, de}`), not buried in a variant's body — it is a fact about the entry, and the builder must find
+it without parsing prose; class 3 stays a whole document per language.
+
+Why not map prose too (the old model taken all the way): prose is not a value. A translated document
+legitimately differs in length, section count and media, and MD-Blocks is a document format — a language
+dimension at every node would infect the format to buy structural parity we could not honestly promise.
+Duplicating *facts*, by contrast, is pure drift risk with no compensating value.
 
 *Cost, and it is the expensive one:* it changes the entry shape (D6), and it is cheapest **now** — only two
 variants exist and only one is genuinely bilingual.
@@ -209,23 +222,38 @@ Proposed: facts on the entry, variants as `{frontmatter, body}`:
 (`title` says yes — it is the one field that is both, and the data already resolves it: the entry's `name` is
 the shared label, the variant's `title` is the local one).
 
-### D7 — Media: one pool, or per-collection? (**the new finding**)
+### D7 — Media: where the pool lives (**resolved by measurement 2026-09-26**)
 
-The plan asserted "one pool, buckets are labels, not directories" and claimed nDB expressed it. **nDB does
-not** (§2 above): a bucket is a directory inside one database, dedup is per bucket, and there is no
-cross-database access. The "one pool" model is the **old** CMS's.
+This was framed as "which database owns the bucket". **It is not that question.** The old CMS's pool is
+independent of its buckets entirely:
 
-- **(a) One media database** that every collection references; refs stay nURI strings
-  (`bucket:hash.ext`). Cost: **measured** — nDB resolves a link against the *calling* database's `_files/`
-  and fails with a filesystem error otherwise, so a cross-database reference cannot be resolved natively at
-  all. The CMS would have to open the media database itself and resolve by hand. We lose "nDB resolves it".
-- **(b) Media owned per collection.** Cost: **dedup does not cross databases** (measured), so an image used by
-  two collections is stored twice. Acceptable under "storage is cheap", but it changes what "the media pool"
-  means, and the admin's Files screen becomes per-collection or federated.
-- (c) Declare buckets per database in `meta.json` and accept a pool **within** a database only.
+```
+database/storage/files/                             ← originals
+database/storage/cache/<variant>/<mediaId>.<ext>    ← one DIRECTORY per variant
+    big_avif/0BrlLZrU5UyY5FvZ.avif
+    big_jpg/…   big_webp/…   medium_avif/…   thumb_avif/…   thumb_cms/…
+```
 
-**Not proposed — needs David's call.** The deciding question is whether cross-collection asset reuse is real
-for raum.com. If it is, (a) costs CMS-side resolution; if it is not, (b) is simpler and native.
+Keyed by media `_id`, one directory per variant, in **one shared root**. The `bucket` is a *field on the
+media record* — a label for the admin's Files screen; moving a media item between buckets moves no bytes.
+That is exactly what "buckets are labels, not directories" meant, and it is not nDB-shaped.
+
+nDB buckets offer none of what the pool needs: no variant concept, one blob per content hash under a
+hash-derived name, a root bound to a single database, and no cross-database read at all (measured — the
+resolver builds a path inside the *calling* database and fails with ENOENT). The pool needs a stable id per
+asset, many predictable variants, and one root outside every collection.
+
+**Proposed: the pool is CMS-side, as it was** — a filesystem pool the CMS owns, with nDB holding only
+references, and nDB's file buckets unused for content media. What `bucket` then means is open (D7a below).
+
+*Supporting measurement:* across the whole archive, **zero** media files appear in two different collections
+(561 in `works`, 79 in `audio_player`; the only overlap is `works` with its own trash). The old domain
+buckets permitted sharing; the content never needed it — which is why keeping the pool outside nDB costs
+nothing today.
+
+- **D7a (open, small):** does `bucket` survive as a label on the media record, or is it dropped?
+- **D7b (open, a build-contract question, not storage):** does the **renderer** resolve variants at build
+  time from the pool, or does the CMS pre-resolve them?
 
 ### D8 — What is an entry with **zero** variants?
 
@@ -265,9 +293,9 @@ the block editor's design. All live in the plan (§11, §13).
    need to be raw editing of the **entry**, not of a variant. We have not worked this through.
 2. **D5 rests on one bilingual entry.** `title` differs, `date` and `tags` are identical — n=1. The
    shared/local split is a reasonable inference, not a measurement.
-3. **D7 may be the wrong frame entirely.** We have assumed the CMS should own the media pool. nDB's own
-   stance is that definitions are admin territory; perhaps media resolution belongs to the *renderer* at
-   build time and the CMS should store only references and never resolve them at all.
+3. ~~D7 may be the wrong frame entirely.~~ **Resolved 2026-09-26** — it was the wrong frame. The pool is not
+   an nDB concern at all (D7), so "which database owns the bucket" was a question about nothing. What
+   remains is D7b, a build-contract question rather than a storage one.
 4. **D3 vs the set-editor we already shipped.** It writes definitions over HTTP today. If D3(b) holds, part
    of that UI has to become a reviewed, previewed change rather than a Save.
 5. ~~We have verified nDB's *docs* but not run its behaviour.~~ **Closed 2026-09-26** — the probe in §2

@@ -184,22 +184,30 @@ form-level validation container. None of these block the pattern; they shape §1
     Database axis's set-editor edits it — and no code reads it: not the API on write, not the admin,
     not a renderer. §3's entry row asks for a `language` column that does not exist, and there is no
     per-language route. The model is decided; the places that would hold it to account are not built.
-- **Buckets: the old model and nDB's do not match — this is open (§13).** The old CMS kept buckets as a
-  **separate registry** (`data/admin/buckets_db.json`: Misc, Works, Audio, Herrbasan Music) and a *document*
-  named its bucket in a `media_bucket` field, with every media reference also carrying `{bucket, filename, …}`
-  inline. So they were one pool shared across tables — `works` used only "Works", but by convention, while
-  `audio_player` already spans two (one document names "Herrbasan Music", the other names none).
-  **nDB does not work that way.** A bucket is a **directory inside the database folder** —
-  `_files/<bucket>/<hash8>.<ext>`, a sibling of `data.jsonl`, created implicitly on first use via
-  `db.bucket("name")` — so buckets are scoped to one database, dedup is per bucket, and trash is
-  `_trash/files/<bucket>/`. There is no cross-database pool, and no database↔bucket declaration to make,
-  because a database *contains* its buckets. `meta.json` carries a `buckets` block for **policies**
-  (`onDocumentDelete`, `ttl_seconds`), not for access, and the core ignores it (see above).
-  - So "one pool, buckets are labels, not directories" is the **old** CMS's model. This section previously
-    claimed nDB expressed it; it does not. Which shape the new CMS wants — one media database that every
-    collection references, or media owned per collection — is a real decision, with teeth: **dedup does not
-    cross databases**, so an image used by two collections is stored twice, and a cross-collection reference
-    cannot be resolved by nDB at all. Carried in [soft-schema-decision-brief.md](soft-schema-decision-brief.md).
+- **The media pool is not an nDB concern — measured 2026-09-26.** The old CMS's pool has nothing to do with
+  its buckets. The bytes live in one shared place: `database/storage/files/` (originals) and
+  `database/storage/cache/<variant>/<mediaId>.<ext>` — **one directory per variant** (`big_avif/`, `big_jpg/`,
+  `big_webp/`, `medium_*`, `thumb_*`, `thumb_cms`), keyed by the media `_id`. So "buckets are labels, not
+  directories" is exactly right about the old CMS: `bucket` is a **field on the media record**
+  (Misc / Works / Audio / Herrbasan Music) used to group the admin's Files screen, and moving a media item
+  between buckets moves no bytes. `Misc` is referenced by no collection at all — the relic of a grouping
+  nobody used.
+  - **nDB cannot express that.** A bucket there is a *directory inside a database folder* —
+    `_files/<bucket>/<hash8>.<ext>`, created implicitly on first write via `db.storeFile(bucket, …)` (the
+    Rust API's `db.bucket(name)` has no Node equivalent), hash-named, one blob per content hash, with
+    per-bucket dedup and trash. It has no notion of variants, its root is a single database, and a second
+    database cannot read a first's file at all — measured: the resolver builds a path inside the *calling*
+    database and fails with ENOENT. `meta.json` carries a `buckets` block for **policies**
+    (`onDocumentDelete`, `ttl_seconds`), not for access, and the core ignores it (see above).
+  - The pool needs three things nDB buckets do not offer: a **stable id per asset**, **many variants per
+    asset under predictable names**, and **one root outside any collection**. So it stays where the old CMS
+    had it — a **CMS-side filesystem pool** — and nDB holds only references. This section previously claimed
+    nDB expressed the pool; it does not. **What `bucket` means in the new CMS is open (§13): a label on the
+    media record as before, or dropped.**
+  - Evidence that a cross-collection pool is not *needed*: across the whole real archive, **zero** media
+    files are referenced by two different collections (561 in `works`, 79 in `audio_player`; the only
+    overlap is `works` with its own trash). The old domain buckets permitted sharing; the content never did
+    it. Carried in [soft-schema-decision-brief.md](soft-schema-decision-brief.md) D7.
 - **Collections are separate document stores, not labels in one pool.** *Corrected 2026-09-25 while building
   build-order step 2:* an earlier draft of this section lumped collections in with buckets. They are not the
   same mechanism. The old CMS kept one file per collection, and the implementation keeps one nDB database
