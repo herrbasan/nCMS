@@ -98,6 +98,11 @@ async function handleApi(req, res, pathname) {
 		if (req.method === 'DELETE') return ok(res, store.deleteCollection(key));
 		throw new HttpError(405, 'method_not_allowed', `${req.method} ${pathname}`);
 	}
+	if (segments[3] === 'definition' && segments.length === 4) {
+		if (req.method === 'GET') return ok(res, store.readDefinition(key));
+		if (req.method === 'PUT') return ok(res, store.setCollectionDefinition(key, await readJsonBody(req)));
+		throw new HttpError(405, 'method_not_allowed', `${req.method} ${pathname}`);
+	}
 	if (segments[3] !== 'entries') {
 		throw new HttpError(404, 'not_found', `No API route for ${pathname}.`);
 	}
