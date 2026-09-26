@@ -198,6 +198,22 @@ async function main() {
 	check('both whole documents round-trip', reopened.docs.en === ENTRY.docs.en && reopened.docs.de === ENTRY.docs.de);
 	check('a missing translation is allowed', !('fr' in reopened.docs) && !('fr' in reopened.facts.title));
 
+	// 4b. `display: "name"` names the entry's own top-level field. It must read it — not report it missing
+	// just because `name` is not one of the declared facts.
+	const byName = (await call('GET', `${collectionRoute()}/entries`)).payload.data.find((e) => e._id === ENTRY_ID);
+	check('display "name" reads the top-level entry name',
+		byName.title === ENTRY_NAME && byName.displayMissing === null, show(byName));
+
+	// …while an entry that genuinely has no name still has it reported as missing, explicitly.
+	const nameless = await call('POST', `${collectionRoute()}/entries`, {
+		slug: 'nameless', facts: { customer: 'Nobody' }
+	});
+	const namelessRow = (await call('GET', `${collectionRoute()}/entries`)).payload.data
+		.find((e) => e._id === nameless.payload.data?._id);
+	check('an entry with no name reports it missing, not blank',
+		namelessRow.title === null && namelessRow.displayMissing === 'name', show(namelessRow));
+	await call('DELETE', entryRoute(nameless.payload.data._id));
+
 	// 5. Raw-edit the whole entry, as the universal floor does.
 	await saveEntry({
 		...reopened,

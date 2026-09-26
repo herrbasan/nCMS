@@ -647,8 +647,10 @@ saying so needs no parser. Missing translations stay allowed — a variant that 
   `{de: …, en: …}`. Semantically identical, but any comparison of stored objects must be by value, and the raw
   editor will show keys in a different order than they were typed.
 - **A defined collection's label comes from the declared display field**, taking the first declared language
-  that holds a value for a per-language field. When an entry has **no** value for that field the summary
-  reports `displayMissing` (naming the field) with `title: null` — it does not quietly fall back to the
-  entry's name, and the row shows "no <field>" with the id still in its meta line. A definition with no
-  display field configured falls back to the entry's `name`, which is its identity field rather than a guess
-  about which fact to read; a legacy collection keeps the old heuristic unchanged.
+  that holds a value for a per-language field. The field may name either a **declared fact** or the entry's own
+  **`name`** — the latter is part of the fixed entry shape rather than a fact, so it cannot be declared and is
+  read directly. When an entry has **no** value for the configured field the summary reports `displayMissing`
+  (naming the field) with `title: null` — it does not quietly fall back to the entry's name, and the row shows
+  "no <field>" with the id still in its meta line. A definition configuring **no** display field falls back to
+  the entry's `name` — its identity field, not a guess about which fact to read, and not the fallback a
+  configured-but-absent field must never get. A legacy collection keeps the old heuristic unchanged.
