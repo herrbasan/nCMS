@@ -184,6 +184,15 @@ form-level validation container. None of these block the pattern; they shape §1
   reclaims storage, or the distinction and its safety net collapse. **nDB provides this natively:** `delete()`
   tombstones the record and archives the full document to `_trash/docs/data.jsonl`, `restore(id)` brings it
   back, and `trash_ttl` / `trash_purge_interval` are the hook for making the purge a policy.
+- **A collection deletes the same way, and the argument is settled by a Windows constraint.** Tombstone the
+  *declaration* in `data/meta/data.jsonl`: `listCollections()` reads declarations, so the collection leaves
+  the axis while the folder and every document in it stay exactly where they are, and `restore(id)` brings it
+  back. The first implementation instead *moved* the folder into a trash directory and threw `EPERM` — nDB's
+  Node API has **no `close()`**, so the database handle stays open for the life of the process, and Windows
+  refuses to rename an open file. Marking is also the truer model: the two stages mean different things, and
+  neither of them is a filesystem operation.
+  *Consequence for §11.3's Trash screen:* restoring a collection is `metaDb.restore(id)`; purging it is the
+  folder removal, and that must not be offered while a handle to it is live.
 - **Considered, not committed:** auto-tiering trashed data to cold storage. If built, purge becomes a
   *policy* rather than a user action, and **restore must work from cold** — otherwise trash is a lie.
 - **nDB API caveat (verified in v1):** only *loosely* modelled on neDB. **No cursor chaining** — no lazy
@@ -327,6 +336,26 @@ Top-down: the pattern first, then the screens, then the editor.
    Library defects found and filed while building: nui_wc2 #53–#58.
 3. **Remaining screens** — the other scope axes (files/buckets, tables, trash) and their create/edit/delete
    axis actions. Each is a composition, not a design.
+   - **The Database axis and its set-editor — done 2026-09-26** (`4a91e11`). The collection links now sit in a
+     `Database` group whose `rowAction` gear opens the set-editor the old CMS has in
+     `16-edit-collections.png`: one row per collection (name + languages), a `×` that confirms and removes the
+     row, and a blank row that adds one. Save diffs the form against what the API returned and sends only the
+     differences; the API gained `POST /api/collections` and `GET`/`PATCH`/`DELETE /api/collections/:key`.
+     Verified in the browser (add, rename, delete) and by 27 assertions over the failure codes —
+     `invalid_name`, `invalid_key`, the reserved `meta` key, `collection_exists` (409), `key_immutable`,
+     unknown collection (404).
+     *What it cost:* one real bug that no amount of looking would have found — see §5 on why deletion is a
+     tombstone and not a folder move. *What it proved:* the axis actions are indeed a composition;
+     `rowAction` was shipped for exactly this and needed no change.
+   - **A rejected save must not cost the edit** — the raw editor's rule now holds for the set-editor too. A
+     validation failure or a server error reopens the form carrying the author's values, and only a row whose
+     collection exists carries a delete control (a carried row is an uncommitted addition, cancelled by
+     clearing its name).
+   - Remaining: **Files/buckets** (waits on the media surface, §11.4), **Trash** (restore/purge over the
+     tombstones this step creates), **Server Info** and **Live Log** (fixed tooling).
+   - **Not the axis's jobs after all:** the completion banner the first build showed on every save is gone.
+     The axis and the list are the feedback; a notification is reserved for failures, which is the one thing
+     the DOM cannot show on its own.
 4. **The media surface** — upload, job progress via SSE, reprocess, failure surfacing.
 5. **The block editor** — the outlier (§3), and the only screen that is genuinely new design. It has
    already diverged from the old reference; ux-grammar.md and the composed-editor screen
@@ -354,7 +383,9 @@ Top-down: the pattern first, then the screens, then the editor.
    selects between them. Verify against the live admin before designing.
 2. **`nui-link-list` row action** — *resolved 2026-09-25*: generic, any item at any depth, with
    `headerAction` kept as an alias. Recorded as a decision rather than left as a question.
-3. **Trash semantics** for entries and media — one trash, or per-collection?
+3. **Trash semantics** — *collections resolved 2026-09-26*: a deleted collection is a tombstone on its
+   declaration, so its trash is the **meta database's** trash (`data/meta/_trash/docs/data.jsonl`) — one place
+   for all of them, not one per collection. Still open for **media**, which is a pool rather than a container.
 4. **Concurrency** — `m_date` optimistic locking on write (reject stale), or last-write-wins? An LLM
    client racing the admin UI is a real scenario.
 5. **Render trigger** — does saving enqueue a re-render, or is rendering an explicit job/CLI step?
