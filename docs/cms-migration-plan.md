@@ -265,8 +265,33 @@ consumer. Plain JSON, predictable errors, no UI-coupled state.
 - The block editor *shell* is **CMS-side**: its schema is the CMS's data model. Promote only if a second
   consumer appears.
 - **nui_wc2 is not a framework, and the model must know it.** Its DOM-first patterns deliberately run
-  against training-data habits. **Any session writing admin code reads `modules/nui_wc2/LLM-CHEATSHEET.md`
-  plus the per-component docs first.** Do not improvise against the library.
+  against training-data habits. **Start from `modules/nui_wc2/nui-boilerplate/` and adapt it — do not
+  assemble a shell from component docs.** That distinction is not stylistic: the first attempt at §11's
+  step 2 was assembled from snippets, produced five structural deviations, and was discarded whole.
+  Copying a working base is the one approach here that priors cannot argue with.
+- **Read the guides in order, and read them to the end.** `documentation/DOCUMENTATION.md` gives the
+  reading order, and its last lines carry a Quick Decision Tree *and* the pointer to the boilerplate — the
+  two things that would have prevented the discarded attempt. The tail of a long file is the least-read part
+  of it, so anything load-bearing must be assumed to be read last, or not at all.
+  ⚠️ **Never claim a document was read "in full" without a verified line count.**
+  `Get-Content | Measure-Object -Line` *skips blank lines* and under-reports by 20–30% (cheatsheet: 763 vs
+  978 real), which is how a prefix gets mistaken for a whole file. Use `(Get-Content $f).Count`.
+- **Run the validator.** `nui.debug.run()` checks `nui-app` structure, missing inner elements, addon
+  registration, attribute typos and `data-action` targets. It is **not** auto-loaded — the cheatsheet's
+  `?nui-debug` query param does nothing (nui_wc2#55) — so import it explicitly in the shell during
+  development. Note what it does **not** cover: the composition rules below. It passes on both the
+  discarded and the delivered shell, which is exactly the limitation to keep in mind.
+- **The composition rules no document states.** Each one cost a detour; the full list with rationale is in
+  `Agents.md`. The ones that bite in a shell: `nui-sidebar` **forces `mode="fold"`** on its inner list and
+  delegates the list API, so drive the sidebar, not the element; a route **type** handler is
+  `(id, params, wrapper)` while a **feature** handler is `(wrapper, params)` (nui_wc2#56); a custom type gets
+  **no theme styling**, so the shell's height must be passed down through the router's `.content-*` wrapper or
+  a virtualized list renders nothing, silently; a link list renders `role="tree"` — `role="navigation"`
+  belongs to `nui-skip-links` (nui_wc2#54).
+- **Copying the boilerplate inherits its defects.** On copy, fix three: the CSP needs `img-src 'self' data:`
+  or `nui-list`'s sort caret is silently blocked; `toggle-sidebar` is a built-in `data-action` and the
+  boilerplate *also* handles it, so two document-level listeners cancel each other out; its header icon
+  buttons omit the inner `<button>` and `aria-label` the cheatsheet requires for production (nui_wc2#57).
 - **Build in `nui_wc2` with real fixtures**, keep the demos as living documentation, and expect one
   revision pass at first integration — that is the design working, not failure.
 
@@ -278,15 +303,28 @@ Top-down: the pattern first, then the screens, then the editor.
    unfinished feature rather than a missing one; §4 records the correction. It earned its keep as the
    calibration exercise: it exposed that the library's **docs and demos understate what the library can
    do**, so §4 must be verified against the implementation before it is trusted.
-2. **The shell, and one screen end to end** — **done 2026-09-25** (`98fcf91`). `node server.js`, zero
-   dependencies: `node:http` + nDB in-process. The axis is `nui-link-list`, the pane is `nui-list`, and the
-   **raw/JSON editor** (`nui-code-editor` in a `nui-dialog`) was the first editing path, as planned — it
-   makes every content type editable at once. Verified create → edit → save → delete against real MD-Blocks
-   data, with the write landing as an append-only record and the delete as a tombstone plus a copy in nDB's
-   own trash.
-   *What it proved:* the pattern composes. A screen needed no new interaction design — only a choice of scope
-   axis and a row renderer. *What it cost:* one runtime bug (teardown called `cleanUp()` before `remove()`,
-   and disconnection calls it again) that the screen never showed — found in the console log, not the UI.
+2. **The shell, and one screen end to end** — **done 2026-09-26** (`4e73c38`), after one discarded attempt.
+   `node server.js`, zero dependencies: `node:http` + nDB in-process. The axis is `nui-link-list`, the pane
+   is `nui-list`, and the **raw/JSON editor** (`nui-code-editor` in a `nui-dialog`) is the first editing
+   path, as planned — it makes every content type editable at once. Verified create → edit → save → delete
+   against real MD-Blocks data; writes land as append-only records, deletes as tombstones plus a copy in
+   nDB's own trash.
+   - **Discarded attempt** (`98fcf91`, git history only): the shell was *assembled from component docs* and
+     came out with five structural deviations — a `<nav>` wrapper around the list (permitted, then removed
+     on a false premise), `<main>` where the shell uses `nui-main`, page state in the app header, no
+     ready-gate, and `mode="tree"` on the sidebar's list. Rejected on inspection as "too many things not
+     following the right pattern".
+   - **Rebuilt by copying `nui-boilerplate/`** and adapting it: `admin/index.html` 59 lines differ,
+     `css/main.css` 79, `js/app.js` rewritten in the boilerplate's shape. Navigation comes from the API;
+     content is a registered route **type** (`#col=<key>`) rather than a fragment page, because a collection
+     view is generated in JS rather than fetched.
+   - **Re-verified against pin `38e605e`** (2026-09-26) after the library advanced: validator clean, round
+     trip works, pane 1156px — no change needed.
+   *What it proved:* the pattern composes — a screen needed no new interaction design, only a choice of scope
+   axis and a row renderer. *What it cost:* a full rewrite, because the failure was in the **method**, not
+   the library (§7). The validator passes on both the discarded and the delivered shell, which is the
+   limitation that matters: **it does not cover the composition rules that actually bite.**
+   Library defects found and filed while building: nui_wc2 #53–#58.
 3. **Remaining screens** — the other scope axes (files/buckets, tables, trash) and their create/edit/delete
    axis actions. Each is a composition, not a design.
 4. **The media surface** — upload, job progress via SSE, reprocess, failure surfacing.
