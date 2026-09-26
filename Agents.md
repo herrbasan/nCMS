@@ -99,8 +99,9 @@ Deletion is nDB's tombstone **plus** its document trash (`_trash/docs/data.jsonl
 destroyed until the trash is emptied. `nDB`'s `trash_ttl` / `trash_purge_interval` options are the
 hook for making that a policy rather than a manual act. Deleting a **collection** is the same
 tombstone applied to its declaration — the folder and every document in it stay exactly where they
-are. That is a preference, not a constraint: nDB's native binding implements `close()` and it releases
-the Windows lock; the public JS wrapper omits it (nDB #5). `node tools/probe-ndb.js` checks both.
+are. That is by design, for restore semantics, not a filesystem constraint. Upstream state, and the
+order a later purge must follow (finish work → `close()` → drop the handle → remove files), are in the
+plan §5.
 
 ## Layout
 

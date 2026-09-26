@@ -13,6 +13,10 @@
 //
 // Touches nothing in the repository: everything happens in a fresh temp folder, which it prints and leaves
 // in place for inspection.
+//
+// Expect two kinds of check to flip once the pending nDB revision is adopted (see the brief's §1a): the
+// lifecycle pair, because the wrapper then exposes `close()`, and the schema check, never. A flip is the
+// signal to revisit the decision that rested on the fact — not a regression.
 
 const fs = require('node:fs');
 const os = require('node:os');

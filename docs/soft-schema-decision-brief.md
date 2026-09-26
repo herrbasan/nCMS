@@ -38,6 +38,40 @@
 
 ---
 
+## 1a. Three states, kept apart
+
+Every claim below is one of these, and they are not interchangeable:
+
+| state | what it means |
+|---|---|
+| **today** | shipped in nCMS and verified against the pinned nDB |
+| **pending nDB** | fixed and verified in nDB's local checkout (`63264cb`), **not deployed and not in the pin nCMS uses (`987c7b1`)**. nCMS must not rely on it, and the pin must not move without approval. |
+| **proposal** | a choice in this brief — not agreed, not built |
+| **unimplemented** | on nDB's roadmap, implemented nowhere |
+
+### Upstream items and where they stand
+
+| item | state |
+|---|---|
+| #4 — bucket GC counted failed deletes as success, swallowed I/O errors | **pending nDB** — GC now counts successful moves only |
+| #5 — public wrapper omitted the native `close()`; `open(path, options)` discarded a second handle | **pending nDB** — wrapper exposes `close()`; no discarded handle |
+| #6 — `insert()` aborted the process on a non-object document | **pending nDB** — invalid shapes are catchable errors |
+| deletion could destroy before its restorable copy was written; cleanup failures unreported | **pending nDB** — the tombstone is written first, and deletion refuses to proceed if it cannot be |
+| original error API and throwing behaviour | **unchanged; no consumer migration needed** |
+| #7 — an update can trash referenced media *before* its journal write succeeds, so a failed write leaves the old document pointing at unavailable media | **open upstream, deliberately deferred** — nDB's own task; **do not start it from here** |
+| `meta.json` `schemas` validation (§2.3) | **unimplemented** |
+| the `link` / nURI type (§2.5) | **unimplemented** |
+| native cross-database link resolution | **unimplemented, and not a prerequisite** |
+
+**Nothing upstream implements schema validation, localization, or native cross-database link resolution, and
+none of them is a prerequisite for any decision here.** Display fields, allowed languages, shared/localized
+facts and body policy remain **CMS-owned semantics**; type validation is a separate, later concern.
+
+**Proposal status:** **D5, D6 and D7 are proposals**, not decisions — the media-storage choice and the
+entry/definition design are both still open. D1–D4 and D8–D10 are the shape those proposals assume.
+
+---
+
 ## 2. Verified facts (with evidence)
 
 **nDB's per-database metadata file** — `data/<key>/meta.json`:
@@ -70,9 +104,9 @@ is also the signal that a schema nCMS enforces itself now belongs to nDB.
 | store identical bytes again | same hash → same file (dedup confirmed) |
 | a *second* database calling `getFile('avatars', <the first's hash>, 'png')` | **threw**: `I/O error at …\beta\_files\avatars\7ad5509f.png: The system cannot find the path specified` — and it did **not** create beta's `_files/` |
 | `Database.open()` on a folder with no `meta.json` | works, and does not create one |
-| native lifecycle | the **binding** implements and exports an idempotent `close()` (`napi/src/lib.rs`); the **public wrapper** (`napi/index.js`) omits it — nDB #5 |
+| native lifecycle | the **binding** implements and exports an idempotent `close()` (`napi/src/lib.rs`); the **public wrapper** (`napi/index.js`) omits it — nDB #5, **pending nDB** (§1a) |
 | native `close()` effect | folder rename fails `EPERM` while open and **succeeds after `db._native.close()`** — the lock is releasable today |
-| wrapper `Database.open(path, options)` | builds a native instance, then replaces `_native` with a second `open()` — the first is left to GC (latent leak, noted in nDB #5) |
+| wrapper `Database.open(path, options)` | builds a native instance, then replaces `_native` with a second `open()` — the first is left to GC (latent leak, noted in nDB #5, **pending nDB**) |
 | GC and refcounts | **database-local**: `gc_buckets()` marks from `self.docs` and sweeps `self.base_dir/_files`; counters live in `self.file_refs` |
 
 Two consequences worth stating plainly:
@@ -312,21 +346,29 @@ as a shared pool being impossible. Two coherent options:
   blobs in its own `_files/`; the CMS resolves an asset through that database's handle. No native
   cross-database resolver is required.
 
-**The constraint that decides whether (b) works** (verified in source): **nDB's refcounting and GC are
-*database-local*.** `gc_buckets()` marks from `self.docs` and sweeps `self.base_dir/_files`; the counters live
-in `self.file_refs`. So the **asset records must live in the media database and must themselves hold the
-physical `bucket:hash.ext` refs** — a reference from a content collection would not protect a blob from GC.
-Get that right and (b) gets dedup and refcounted GC for free; get it wrong and the pool is swept.
+**Constraint 1 — nDB's refcounting and GC are *database-local*** (verified in source): `gc_buckets()` marks
+from `self.docs` and sweeps `self.base_dir/_files`; the counters live in `self.file_refs`. So **asset records
+must live in the media database and must hold the physical `bucket:hash.ext` refs themselves** — a reference
+from a content collection would not protect a blob. Get that right and (b) gets dedup and blob-level orphan
+detection; get it wrong and the pool is swept.
 
-**Second constraint, pending upstream.** With (b), the pool's orphan cleanup *is* nDB's GC — and nDB's GC
-currently counts a failed delete as a success and discards listing errors (nDB #4). Orphan blobs would then
-accumulate silently instead of being reported. (a) carries no such dependency, because the CMS owns its own
-cleanup. This does not change the favourite, but it belongs in the comparison rather than being discovered
-later.
+**Constraint 2 — nDB does not provide the media lifecycle.** Two responsibilities stay separate:
 
-**Favourite, stated:** **(b)**, because refcounted GC and dedup are exactly the pool bookkeeping the CMS should
-not hand-roll, and (a) means owning orphan cleanup forever. It is close, though — (a) wins if the variant
-cache's file paths matter to serving.
+- nDB tracks **asset record → physical blob**, within the media database.
+- nCMS governs **content entry → asset**, across collections.
+
+nDB cannot tell whether an asset is safe to delete from references in *other* databases, so **trash, restore
+and purge policy remain the CMS's** — in both options. (b) buys dedup and blob-level orphan detection, not the
+lifecycle.
+
+**Constraint 3 — an update can trash referenced media before its journal write succeeds.** That is nDB **#7**:
+upstream, open, and **deliberately deferred — do not start it from here**. If the journal write fails, the old
+document can survive with an unavailable media reference. It predates all of the above and matters specifically
+for reliable media-record *replacement*. Treat it as a dependency of (b), not as a defect in this design.
+
+**Favourite, stated:** **(b)**, because dedup and blob-level orphan detection are pool bookkeeping the CMS
+should not hand-roll. It is close: (a) carries no dependency on nDB's GC or on its write ordering, and wins if
+the variant cache's predictable paths matter to serving. **Still a proposal — not agreed.**
 
 *Weak evidence, flagged:* zero media files are shared between two collections in the whole archive (561 in
 `works`, 79 in `audio_player`; the overlap is `works` with its own trash). That describes the archive, **not
@@ -367,17 +409,22 @@ archive, and its one varying field is class 2.
 It needs **no new mechanism** under D8: the collection declares `body: none`, its entries are records, and its
 `name` is a localized fact like any other. The importer skipped it — an importer gap, not a model gap.
 
-### D10 — What we want from nDB (all additive, non-breaking)
+### D10 — What is still wanted from nDB (**only what remains**)
 
-1. **Implement `meta.json` `schemas` validation** (§2.3, already planned) — the platform's own roadmap.
-2. **Implement the `link`/nURI type** (§2.5) — media references are exactly the case it exists for.
-3. **Resolve a link against a *named* database**, not only the caller's own — this is what would make D7(b)
-   native instead of CMS-side.
+The wrapper/`close()`, GC-reporting, process-abort and deletion-ordering items are **fixed in nDB's local
+checkout and not adopted here** (§1a). They are not asks. What remains unimplemented:
+
+1. **`meta.json` `schemas` validation** (§2.3, nDB's own roadmap). **Not a prerequisite** for this design — it
+   validates storage types, which D1 keeps in a separate namespaced key from the CMS's semantics.
+2. **The `link` / nURI type** (§2.5) — media references are exactly its case. Also not a prerequisite; nCMS
+   resolves references either way.
+3. **Native cross-database link resolution** — would let D7(b) resolve without the CMS opening the media
+   database. **Explicitly not a prerequisite**, and the cheapest of the three to live without.
 4. Buckets declared upfront and dynamic creation restricted (§2.4.2's own intent) — only if D7 lands on a
    shape that needs it.
 
-*(The wrapper's missing `close()` is not on this list: the native binding has it and it works. It is a
-one-line wrapper fix, filed as nDB #5.)*
+*(Two items left this list by being fixed rather than wanted: the wrapper's missing `close()`, and `insert()`
+returning an error instead of aborting the process. See §1a for their state.)*
 
 ---
 

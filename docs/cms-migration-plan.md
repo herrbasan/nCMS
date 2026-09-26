@@ -219,16 +219,16 @@ form-level validation container. None of these block the pattern; they shape §1
   reclaims storage, or the distinction and its safety net collapse. **nDB provides this natively:** `delete()`
   tombstones the record and archives the full document to `_trash/docs/data.jsonl`, `restore(id)` brings it
   back, and `trash_ttl` / `trash_purge_interval` are the hook for making the purge a policy.
-- **A collection deletes the same way, and it is a choice rather than a constraint.** Tombstone the
-  *declaration* in `data/meta/data.jsonl`: `listCollections()` reads declarations, so the collection leaves
-  the axis while the folder and every document in it stay exactly where they are, and `restore(id)` brings it
-  back. A folder move is also available — nDB's **native binding implements `close()`, and it does release
-  the Windows lock** (`EPERM` while open, rename succeeds after `db._native.close()`; measured, and asserted
-  by `tools/probe-ndb.js`), though the public JavaScript wrapper omits it (nDB #5). Marking is preferred
-  because it is the truer model: the two stages mean different things, neither of them is a filesystem
-  operation, and it needs no trash directory.
-  *Consequence for §11.3's Trash screen:* restoring a collection is `metaDb.restore(id)`; purging it is the
-  folder removal, which is safe once the handle is closed.
+- **A collection deletes the same way, by design.** Tombstone the *declaration* in `data/meta/data.jsonl`:
+  `listCollections()` reads declarations, so the collection leaves the axis while the folder and every document
+  in it stay exactly where they are, and `restore(id)` brings it back. The reason is **restore semantics** — the
+  two stages mean different things and neither is a filesystem operation — **not** any constraint on moving
+  folders. Deletion must not depend on whether Windows permits a move.
+  *Consequence for §11.3's Trash screen:* restoring a collection is `metaDb.restore(id)`. **Purging** it is a
+  separate, later step and has an order: finish outstanding work on the database, `close()` it, drop it from
+  the store's handle cache, *then* remove the files. `close()` releases the OS lock but does **not** drain
+  pending async operations, so it is the second step, not the first — and it is in nDB's local checkout, not
+  in the pin this project uses (see the upstream note below).
 - **Considered, not committed:** auto-tiering trashed data to cold storage. If built, purge becomes a
   *policy* rather than a user action, and **restore must work from cold** — otherwise trash is a lie.
 - **nDB API caveat (verified in v1):** only *loosely* modelled on neDB. **No cursor chaining** — no lazy
@@ -267,6 +267,14 @@ form-level validation container. None of these block the pattern; they shape §1
     as a separate pool item with no reference from the video.
   - **`_id` is not preserved.** nDB generates the entry id; the old one is kept as `n000b_id` so an imported
     entry can always be traced back to its source.
+
+- **Upstream state (2026-09-26).** nDB's reliability fixes — deletion ordering, GC reporting, non-object
+  documents as catchable errors, and a public `close()` — are verified in nDB's local checkout (`63264cb`) but
+  **not deployed, and not in the pin this project uses (`987c7b1`)**. Nothing here may rely on them and the
+  pin must not move without approval. One limitation remains open upstream and is deliberately deferred:
+  **nDB #7** — an update can trash referenced media *before* its journal write succeeds, leaving the old
+  document with an unavailable reference. It matters for reliable media-record replacement specifically.
+  Full status: [soft-schema-decision-brief.md](soft-schema-decision-brief.md) §1a.
 
 ## 6. Media
 
