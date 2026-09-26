@@ -56,8 +56,8 @@
 | There is **no cross-database file access** — `FileBucket::new(name, base_dir)` is bound to one database folder | same |
 | `meta.json`'s `buckets` block is for **policies** (`onDocumentDelete`, `ttl_seconds`), not access control — and is ignored | `database_evolution_plan.md` §2.3/§2.4.1 |
 **Measured against the pinned build** (`modules/nDB`, 2026-09-26, in a throwaway folder — not inferred
-from docs). This closes blind spot 5; every row below is behaviour, not a claim:
-
+from docs). This closes blind spot 5; every row below is behaviour, not a claim:**Reproduce all six with `node tools/probe-ndb.js`** — it asserts them and fails loudly if nDB drifts, which
+is also the signal that a schema nCMS enforces itself now belongs to nDB.
 | probe | result |
 |---|---|
 | insert a document violating the declared `meta.json` schema (`title` as a number, `avatar` not an nURI, plus an undeclared field) | **no error, no warning — written and read back intact.** The `schemas` block is inert. |
