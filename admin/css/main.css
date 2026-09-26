@@ -60,3 +60,44 @@
 .cms-row-meta {
 	white-space: nowrap;
 }
+
+/* The collections set-editor's form. Plain inputs on purpose: NUI has no form builder, and
+ * reaching into an nui-* component from here would fight the design system. */
+.cms-collections {
+	display: flex;
+	flex-direction: column;
+	gap: var(--nui-space);
+}
+
+.cms-collection-row {
+	display: flex;
+	align-items: center;
+	gap: var(--nui-space);
+}
+
+/* The last row is the "add" row — set apart, not styled like the rest. */
+.cms-collection-row:last-child {
+	padding-block-start: var(--nui-space);
+	border-block-start: 1px solid var(--border-shade2);
+}
+
+.cms-field {
+	flex: 1;
+	min-inline-size: 0;
+	padding: var(--nui-space-half) var(--nui-space);
+	border: 1px solid var(--border-shade3);
+	border-radius: var(--border-radius1);
+	background: var(--color-base);
+	color: var(--text-color);
+	font: inherit;
+	font-size: var(--font-size-small);
+}
+
+.cms-field-langs {
+	flex: 0 0 9rem;
+}
+
+.cms-empty {
+	padding: var(--nui-space-double);
+	color: var(--text-color-dim);
+}

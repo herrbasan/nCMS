@@ -79,13 +79,22 @@ API, with the envelope `{status:true,data}` / `{status:false,error,message,detai
 
 | Method | Path |
 |---|---|
-| `GET` | `/api/collections` |
+| `GET` · `POST` | `/api/collections` |
+| `GET` · `PATCH` · `DELETE` | `/api/collections/:key` |
 | `GET` · `POST` | `/api/collections/:key/entries` |
 | `GET` · `PUT` · `DELETE` | `/api/collections/:key/entries/:id` |
 
+A collection is a declaration in `data/meta/data.jsonl` plus a folder of its own. The declaration
+is load-bearing: `Database.open()` **creates** a database it cannot find, so membership is checked
+before opening. `key` is the identity (the folder and the API path) and is immutable — `name` and
+`translatability` are what `PATCH` edits.
+
 Deletion is nDB's tombstone **plus** its document trash (`_trash/docs/data.jsonl`): nothing is
 destroyed until the trash is emptied. `nDB`'s `trash_ttl` / `trash_purge_interval` options are the
-hook for making that a policy rather than a manual act.
+hook for making that a policy rather than a manual act. Deleting a **collection** is the same
+tombstone applied to its declaration — the folder and every document in it stay exactly where they
+are, which is also the only reliable option: nDB's Node API has no `close()`, so the database handle
+stays open for the life of the process and Windows refuses to rename an open file (`EPERM`).
 
 ## Layout
 

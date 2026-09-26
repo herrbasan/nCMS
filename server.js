@@ -84,13 +84,19 @@ async function handleApi(req, res, pathname) {
 	}
 
 	if (segments.length === 2) {
-		if (req.method !== 'GET') throw new HttpError(405, 'method_not_allowed', `${req.method} ${pathname}`);
-		return ok(res, store.listCollections());
+		if (req.method === 'GET') return ok(res, store.listCollections());
+		if (req.method === 'POST') return ok(res, store.createCollection(await readJsonBody(req)));
+		throw new HttpError(405, 'method_not_allowed', `${req.method} ${pathname}`);
 	}
 
 	const key = decodeURIComponent(segments[2]);
 	if (segments.length === 3) {
-		throw new HttpError(404, 'not_found', `No API route for ${pathname}. Use /api/collections/${key}/entries.`);
+		if (req.method === 'GET') return ok(res, store.getCollection(key));
+		if (req.method === 'PATCH' || req.method === 'PUT') {
+			return ok(res, store.updateCollection(key, await readJsonBody(req)));
+		}
+		if (req.method === 'DELETE') return ok(res, store.deleteCollection(key));
+		throw new HttpError(405, 'method_not_allowed', `${req.method} ${pathname}`);
 	}
 	if (segments[3] !== 'entries') {
 		throw new HttpError(404, 'not_found', `No API route for ${pathname}.`);

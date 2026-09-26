@@ -35,6 +35,9 @@ const entryUrl = (key, id) =>
 
 const stamp = (ms) => (ms ? new Date(ms).toLocaleString() : '—');
 
+// The collection the current route points at — `#col=<key>` — or null.
+const routeKey = () => (location.hash.match(/^#col=(.+)$/) || [])[1] ?? null;
+
 // ─── App actions ─────────────────────────────────────────────────────────────────────────────
 // Only actions NUI does NOT already handle. `toggle-sidebar` is a built-in data-action handler;
 // the boilerplate ALSO handles it in its own document-level switch, so it fires twice and
@@ -142,7 +145,6 @@ async function deleteSelected(list, key) {
 	for (const row of selected) {
 		await api('DELETE', entryUrl(key, row.data._id));
 	}
-	notify(`Deleted ${selected.length}.`);
 	await activeView?.reload();
 }
 
@@ -180,8 +182,151 @@ async function openEditor(key, id, source) {
 	}
 
 	await api('PUT', entryUrl(key, id), doc);
-	notify(`Saved ${id}.`);
 	await activeView?.reload();
+}
+
+// ─── Collections — the axis actions ─────────────────────────────────────────────────────────
+// The plan calls for create / edit / delete on the Database axis, and the library's rowAction
+// is the control for it — it was shipped for exactly this. The dialog is the old CMS's
+// set-level editor: one row per collection, plus a blank row that adds one.
+
+function parseLanguages(text) {
+	return [...new Set(text.split(/[,\s]+/).map((code) => code.toLowerCase().trim()).filter(Boolean))];
+}
+
+function buildCollectionRow(collection) {
+	const row = document.createElement('div');
+	row.className = 'cms-collection-row';
+	row.dataset.key = collection?.key ?? '';
+
+	const name = document.createElement('input');
+	name.type = 'text';
+	name.className = 'cms-field cms-field-name';
+	name.value = collection?.name ?? '';
+	name.placeholder = collection ? '' : 'New collection name';
+	name.setAttribute('aria-label', 'Collection name');
+
+	const languages = document.createElement('input');
+	languages.type = 'text';
+	languages.className = 'cms-field cms-field-langs';
+	languages.value = (collection?.languages ?? []).join(', ');
+	languages.placeholder = 'en';
+	languages.setAttribute('aria-label', 'Languages, comma separated');
+	languages.title = 'Languages this collection is translatable into, comma separated';
+
+	row.append(name, languages);
+
+	// Only a collection that exists can be deleted. A row carried back after a rejected save has
+	// no key yet — it is an uncommitted addition, and clearing its name is how you cancel it.
+	if (!collection?.key) return row;
+
+	const control = document.createElement('nui-button');
+	control.setAttribute('variant', 'icon');
+	const button = document.createElement('button');
+	button.type = 'button';
+	button.setAttribute('aria-label', `Delete ${collection.name}`);
+	button.innerHTML = '<nui-icon name="delete"></nui-icon>';
+	button.addEventListener('click', async () => {
+		const confirmed = await nui.components.dialog.confirm(
+			`Delete collection "${collection.name}"?`,
+			'Its declaration is tombstoned and it leaves the axis. The folder and every document stay '
+			+ 'on disk — nothing is destroyed, and the trash restores it.'
+		);
+		if (confirmed) row.remove();
+	});
+	control.append(button);
+	row.append(control);
+	return row;
+}
+
+// `state` carries the form across a rejected save, the same way the raw editor carries the
+// author's text — a validation failure must never cost them the edit.
+async function openCollectionsEditor(state) {
+	const original = state?.original ?? await api('GET', '/api/collections');
+	const rowsState = state?.rows ?? original.map((c) => ({
+		key: c.key, name: c.name, languages: c.translatability
+	}));
+
+	const { main, result } = await nui.components.dialog.page('Collections', '', {
+		contentScroll: true,
+		buttons: [
+			{ label: 'Cancel', type: 'outline', value: 'cancel' },
+			{ label: 'Save', type: 'primary', value: 'save' }
+		]
+	});
+
+	const rows = document.createElement('div');
+	rows.className = 'cms-collections';
+	for (const collection of rowsState) rows.append(buildCollectionRow(collection));
+	rows.append(buildCollectionRow(null)); // the add row
+	main.append(rows);
+
+	if ((await result) !== 'save') return;
+
+	const rowsNow = [...rows.querySelectorAll('.cms-collection-row')].map((row) => ({
+		key: row.dataset.key || null,
+		name: row.querySelector('.cms-field-name').value.trim(),
+		languages: parseLanguages(row.querySelector('.cms-field-langs').value)
+	}));
+
+	for (const row of rowsNow) {
+		if (!row.name) {
+			if (row.key || row.languages.length) {
+				notify('Every collection needs a name.', 'alert');
+				return openCollectionsEditor({ rows: rowsNow, original });
+			}
+			continue; // a fully blank add row is simply not an addition
+		}
+		if (row.key && !row.languages.length) {
+			notify(`"${row.name}" needs at least one language.`, 'alert');
+			return openCollectionsEditor({ rows: rowsNow, original });
+		}
+	}
+
+	// Only the differences are sent. The key is the identity, so a row's key never changes —
+	// a rename is a change to `name`.
+	const kept = new Map(rowsNow.filter((row) => row.key).map((row) => [row.key, row]));
+	const deletions = original.filter((c) => !kept.has(c.key));
+	const additions = rowsNow.filter((row) => !row.key && row.name);
+	const renames = rowsNow.filter((row) => {
+		const before = original.find((c) => c.key === row.key);
+		return before && (before.name !== row.name
+			|| JSON.stringify(before.translatability) !== JSON.stringify(row.languages));
+	});
+
+	try {
+		for (const collection of deletions) {
+			await api('DELETE', `/api/collections/${encodeURIComponent(collection.key)}`);
+		}
+		for (const row of additions) {
+			await api('POST', '/api/collections', { name: row.name, translatability: row.languages });
+		}
+		for (const row of renames) {
+			await api('PATCH', `/api/collections/${encodeURIComponent(row.key)}`,
+				{ name: row.name, translatability: row.languages });
+		}
+	} catch (error) {
+		// A boundary failure (a colliding key, the server down). Surface it and keep the form.
+		notify(`Not saved — ${error.message}`, 'alert');
+		return openCollectionsEditor({ rows: rowsNow, original });
+	}
+
+	// The axis is derived from the collections, so it is rebuilt rather than patched.
+	await loadNav();
+
+	if (collections.some((c) => c.key === routeKey())) {
+		await activeView?.reload();
+	} else if (collections.length) {
+		// The route pointed at a collection that is now gone. Moving the hash (not router.go)
+		// is what makes the router see the navigation.
+		location.hash = '#col=' + collections[0].key;
+	} else {
+		const empty = document.createElement('p');
+		empty.className = 'cms-empty';
+		empty.textContent = 'No collections. Use the gear on the Database row to add one.';
+		document.querySelector('.cms-pane')?.replaceChildren(empty);
+		activeView = null;
+	}
 }
 
 // ─── Route type: a collection ────────────────────────────────────────────────────────────────
@@ -208,15 +353,38 @@ nui.registerType('col', (id, params, wrapper) => {
 
 // ─── Startup ─────────────────────────────────────────────────────────────────────────────────
 
-collections = await api('GET', '/api/collections');
+async function loadNav() {
+	collections = await api('GET', '/api/collections');
 
-// No `mode` on the list: nui-sidebar forces "fold" on its navigation list, and a sidebar's
-// list IS the navigation. (Setting "tree" here was the one real mistake in the first attempt.)
-document.getElementById('main-navigation').loadData(collections.map((collection) => ({
-	label: collection.name,
-	href: '#col=' + collection.key,
-	icon: 'folder'
-})));
+	// No `mode` on the list: nui-sidebar forces "fold" on its navigation list, and a sidebar's
+	// list IS the navigation. (Setting "tree" here was the one real mistake in the first attempt.)
+	const list = document.getElementById('main-navigation');
+	list.loadData([
+		{
+			label: 'Database',
+			icon: 'database',
+			rowAction: { action: 'edit-collections', icon: 'settings', label: 'Edit collections' },
+			items: collections.map((collection) => ({
+				label: collection.name,
+				href: '#col=' + collection.key,
+				icon: 'folder'
+			}))
+		}
+	]);
+
+	// The row action is icon-only, and the library asks for a tooltip alongside it. The tooltip
+	// host is position: fixed, so injecting it here adds nothing to the row's layout.
+	const gear = list.querySelector('button.action');
+	if (gear) {
+		const tooltip = document.createElement('nui-tooltip');
+		tooltip.textContent = 'Edit collections';
+		gear.after(tooltip);
+	}
+}
+
+nui.registerAction('edit-collections', () => openCollectionsEditor());
+
+await loadNav();
 
 // The navigation must exist before the router starts: on the initial route the router calls
 // setActive() with an href, and there would be nothing to match.
