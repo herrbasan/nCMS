@@ -6,10 +6,10 @@
 //
 // It exists because several decisions in `docs/soft-schema-decision-brief.md` depend on facts that nDB's
 // documentation states but nobody had run: that `meta.json`'s `schemas` block is inert, that a bucket is a
-// directory inside one database, that a cross-database file read cannot work, and that there is no `close()`.
-// Asserting those in prose makes them claims. Running them makes them evidence — and if nDB implements
-// opt-in schema validation (`docs/database_evolution_plan.md` §2.3) this starts failing, which is exactly
-// when nCMS should stop enforcing the schema itself.
+// directory inside one database, that a cross-database file read cannot work, and where lifecycle control
+// actually lives. Asserting those in prose makes them claims. Running them makes them evidence — and if nDB
+// implements opt-in schema validation (`docs/database_evolution_plan.md` §2.3) this starts failing, which is
+// exactly when nCMS should stop enforcing interpretation rules of its own.
 //
 // Touches nothing in the repository: everything happens in a fresh temp folder, which it prints and leaves
 // in place for inspection.
@@ -71,10 +71,32 @@ Database.open(path.join(gamma, 'data.jsonl'), { persistence: 'immediate' }).inse
 check('open() works without meta.json and does not create one', 'no meta.json',
 	fs.existsSync(path.join(gamma, 'meta.json')) ? 'created one' : 'no meta.json');
 
-// ── 5. Is there a lifecycle method? ──────────────────────────────────────────────────────────
+// ── 5. Lifecycle: the binding has close(), the public wrapper omits it (nDB #5) ───────────────
 const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(db));
-const lifecycle = methods.filter((name) => /^(close|destroy|dispose)$/.test(name));
-check('Database exposes no close()/destroy()/dispose()', 'none', lifecycle.length ? lifecycle.join(', ') : 'none');
+check('the native binding implements close()', 'function', typeof db._native.close);
+check('the public wrapper omits close()', 'omits',
+	typeof Database.prototype.close === 'function' ? 'exposes it' : 'omits');
+
+// ── 6. Does native close() release the lock on the database folder? ──────────────────────────
+// This is what decides whether a collection folder can be moved or deleted on demand. An earlier
+// version of the brief claimed the lock was unavoidable; it is not.
+const lockDir = path.join(root, 'lockable');
+fs.mkdirSync(lockDir, { recursive: true });
+const held = Database.open(path.join(lockDir, 'data.jsonl'), { persistence: 'immediate' });
+held.insert({ held: true });
+held.flush();
+const tryRename = () => {
+	try {
+		fs.renameSync(lockDir, `${lockDir}-renamed`);
+		return 'succeeds';
+	} catch (error) {
+		return error.code;
+	}
+};
+const whileOpen = tryRename();
+held._native.close();
+check('folder is locked while the database is open', 'EPERM', whileOpen);
+check('native close() releases the lock', 'succeeds', tryRename());
 
 // ── Report ───────────────────────────────────────────────────────────────────────────────────
 console.log(`nDB behaviour probe — ${methods.length} Database methods on the pinned build\n`);
@@ -85,8 +107,7 @@ for (const { name, expected, actual, ok } of checks) {
 const drifted = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - drifted.length}/${checks.length} as the brief assumes.`);
 if (drifted.length) {
-	console.log('nDB behaviour has changed — the decisions that rest on these facts need revisiting,');
-	console.log('and any schema nCMS enforces itself may now belong to nDB.');
+	console.log('nDB behaviour has changed — the decisions that rest on these facts need revisiting.');
 }
 console.log(`\ntemp folder left for inspection: ${root}`);
 process.exitCode = drifted.length ? 1 : 0;

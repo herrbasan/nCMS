@@ -99,8 +99,8 @@ Deletion is nDB's tombstone **plus** its document trash (`_trash/docs/data.jsonl
 destroyed until the trash is emptied. `nDB`'s `trash_ttl` / `trash_purge_interval` options are the
 hook for making that a policy rather than a manual act. Deleting a **collection** is the same
 tombstone applied to its declaration — the folder and every document in it stay exactly where they
-are, which is also the only reliable option: nDB's Node API has no `close()`, so the database handle
-stays open for the life of the process and Windows refuses to rename an open file (`EPERM`).
+are. That is a preference, not a constraint: nDB's native binding implements `close()` and it releases
+the Windows lock; the public JS wrapper omits it (nDB #5). `node tools/probe-ndb.js` checks both.
 
 ## Layout
 

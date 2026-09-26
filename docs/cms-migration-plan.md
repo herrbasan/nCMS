@@ -219,15 +219,16 @@ form-level validation container. None of these block the pattern; they shape §1
   reclaims storage, or the distinction and its safety net collapse. **nDB provides this natively:** `delete()`
   tombstones the record and archives the full document to `_trash/docs/data.jsonl`, `restore(id)` brings it
   back, and `trash_ttl` / `trash_purge_interval` are the hook for making the purge a policy.
-- **A collection deletes the same way, and the argument is settled by a Windows constraint.** Tombstone the
+- **A collection deletes the same way, and it is a choice rather than a constraint.** Tombstone the
   *declaration* in `data/meta/data.jsonl`: `listCollections()` reads declarations, so the collection leaves
   the axis while the folder and every document in it stay exactly where they are, and `restore(id)` brings it
-  back. The first implementation instead *moved* the folder into a trash directory and threw `EPERM` — nDB's
-  Node API has **no `close()`**, so the database handle stays open for the life of the process, and Windows
-  refuses to rename an open file. Marking is also the truer model: the two stages mean different things, and
-  neither of them is a filesystem operation.
+  back. A folder move is also available — nDB's **native binding implements `close()`, and it does release
+  the Windows lock** (`EPERM` while open, rename succeeds after `db._native.close()`; measured, and asserted
+  by `tools/probe-ndb.js`), though the public JavaScript wrapper omits it (nDB #5). Marking is preferred
+  because it is the truer model: the two stages mean different things, neither of them is a filesystem
+  operation, and it needs no trash directory.
   *Consequence for §11.3's Trash screen:* restoring a collection is `metaDb.restore(id)`; purging it is the
-  folder removal, and that must not be offered while a handle to it is live.
+  folder removal, which is safe once the handle is closed.
 - **Considered, not committed:** auto-tiering trashed data to cold storage. If built, purge becomes a
   *policy* rather than a user action, and **restore must work from cold** — otherwise trash is a lie.
 - **nDB API caveat (verified in v1):** only *loosely* modelled on neDB. **No cursor chaining** — no lazy

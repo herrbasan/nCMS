@@ -6,6 +6,11 @@
 >
 > **Status:** working document. Nothing here is decided except where it says so.
 > Companion: [cms-migration-plan.md](cms-migration-plan.md) (§5 data model, §13 open questions).
+>
+> **Independently reviewed 2026-09-26** by a second model, read-only against this repo; the corrections are
+> folded in. Issues filed from that pass and from verifying it: nDB **#4** (bucket GC counts failed deletes as
+> success and swallows I/O errors), **#5** (the public wrapper omits the native `close()`), **#6** (`insert()`
+> aborts the process on a non-object document).
 
 ---
 
@@ -65,14 +70,17 @@ is also the signal that a schema nCMS enforces itself now belongs to nDB.
 | store identical bytes again | same hash → same file (dedup confirmed) |
 | a *second* database calling `getFile('avatars', <the first's hash>, 'png')` | **threw**: `I/O error at …\beta\_files\avatars\7ad5509f.png: The system cannot find the path specified` — and it did **not** create beta's `_files/` |
 | `Database.open()` on a folder with no `meta.json` | works, and does not create one |
-| lifecycle methods on `Database` | `compact`, `flush`, `restore`, `releaseFile`, `gcBuckets` … and **no `close`, `destroy` or `dispose`** |
+| native lifecycle | the **binding** implements and exports an idempotent `close()` (`napi/src/lib.rs`); the **public wrapper** (`napi/index.js`) omits it — nDB #5 |
+| native `close()` effect | folder rename fails `EPERM` while open and **succeeds after `db._native.close()`** — the lock is releasable today |
+| wrapper `Database.open(path, options)` | builds a native instance, then replaces `_native` with a second `open()` — the first is left to GC (latent leak, noted in nDB #5) |
+| GC and refcounts | **database-local**: `gc_buckets()` marks from `self.docs` and sweeps `self.base_dir/_files`; counters live in `self.file_refs` |
 
 Two consequences worth stating plainly:
 
-- **The bucket model is settled by measurement, not reading.** A cross-database file reference resolves to a
-  *filesystem path built from the calling database's folder*, so it cannot work: nDB has no way to reach
-  another database's files at all. D7 is therefore not a matter of preference for native resolution — there
-  is none to be had (see D10.4).
+- **A cross-database file reference cannot work natively.** It resolves to a *filesystem path built from the
+  calling database's folder*, so nDB cannot reach another database's files through its own handle. What that
+  rules out is **native cross-database resolution** — **not** a shared pool, which a dedicated media database
+  can still back (D7).
 - **The Node API is flat where the Rust API is a bridge.** There is no `db.bucket(name)` in Node (it threw
   `TypeError`); the methods are `storeFile(bucket, name, data, mimeType)`, `getFile(bucket, hash, ext)`,
   `listFiles(bucket)`, `deleteFile`, `releaseFile`, `restoreFile`, `gcBuckets`. Documented as deliberate
@@ -132,23 +140,39 @@ invalid databases.
 - (b) Everything stays in `data/meta/data.jsonl` (the registry that lists collections).
 - (c) A CMS-side file of our own.
 
-**Proposed: (a) for the definition, (b) for existence only.** The registry has to keep existence, because
+**Proposed: (a) for the definition, (b) for existence only.** The registry must keep existence, because
 `open()` creates what it cannot find — a typo'd key would otherwise bring a collection into being. But
-*definition* (schema, buckets, languages) belongs in the collection's own folder, which is where nDB intends
-it.
+*definition* belongs in the collection's own folder, where nDB intends it.
 
 *Known cost:* two files then describe one collection, so precedence must be stated — the registry is
 existence, `meta.json` is definition, and neither may contradict the other.
 
+**The definition lives in that file under a CMS key, not under nDB's `schemas`.** nDB's `schemas` block
+describes **storage types** (`string`, `array`, `link`); what D4 declares is **CMS interpretation** — which
+field is displayed, which languages are allowed, which values are localized. Different contracts, one file:
+writing CMS semantics into `schemas` would be a name collision, not a convergence. So **two contracts, one
+file, namespaced:**
+
+| contract | declares | owner |
+|---|---|---|
+| `schemas` | storage type per field | **nDB** (§2.3, when it lands) |
+| a CMS key (e.g. `cms`) | display field, language set, per-field localization | **nCMS**, always |
+
+`ndb config get/set` already reads and writes arbitrary dot-notation keys in that file, so a namespaced
+extension needs nothing from nDB — and the core ignoring the whole file means it cannot be surprised by one.
+
 ### D2 — Who enforces the definition?
 
-nDB can't yet. So: **nCMS reads and enforces it itself, in nDB's file and nDB's shape.** When §2.3 lands,
-enforcement moves down a layer and **the file does not change** — the migration is "delete our validator",
-not "convert our data".
+**Two owners; this does not converge.** nCMS enforces *interpretation* now and will still enforce it when nDB
+implements type validation — nDB validating that `title` is a string says nothing about whether `title` is
+*displayed* or *localized*. So:
 
-*This is the whole point of the shape choice:* declaring a schema in `meta.json` and assuming nDB enforced it
-would enforce nothing and return false confidence. Declaring it there and enforcing it ourselves costs one
-validator and buys convergence.
+- **nDB's contract** is enforced by nDB when §2.3 lands. Nothing of ours to remove.
+- **nCMS's contract** is enforced by nCMS, permanently. There is no layer below to inherit it.
+
+Keeping them apart is also what makes D1 safe: if nDB's §2.3 arrives with a different vocabulary, only the
+`schemas` key is affected. D2 must not be read as "nDB will do our validation later" — an unimplemented
+roadmap shape is not a compatibility guarantee, and these are not the same contract.
 
 ### D3 — Who *writes* it?
 
@@ -161,6 +185,30 @@ runtime". Our set-editor currently edits `translatability` over HTTP as a side e
 - (c) Read-only in the admin; all edits via `ndb config set`.
 
 **Proposed: (b).** It keeps the admin useful and keeps definition changes deliberate, which is nDB's intent.
+The preview must show the **effects on existing entries**, not merely the JSON diff (D3a) — a definition
+change that cannot be expressed as a view is not a display edit.
+
+### D3a — What does "soft" mean when a definition *changes*?
+
+Adding an ordinary field is free (D4). Changing an *interpretation* is not, and these cannot all be equally
+harmless:
+
+- **shared → localized**: one value must become N. If the languages must differ, there is nothing to derive
+  them from — a human or a model has to decide. The edit cannot be pure.
+- **localized → shared**: N values must become one, and if the translations disagree there is **no correct
+  automatic answer**; silently picking one destroys the rest.
+- **removing an allowed language**: does its content become illegal, hidden, or preserved-as-legacy?
+- **retiring a declared field**: the declaration goes, **the data does not.** Removal is a *separate,
+  explicit* operation, and compaction only reclaims the log history that removal leaves behind. Deleting a
+  declaration must never imply deleting data.
+
+**Proposed:** a definition change is a *diff with effects* — it names, per existing entry, what would become
+ambiguous or orphaned, and it refuses to guess. The ambiguous cases are handed to a human (or an LLM) as an
+explicit conversion rather than resolved by default. And "undeclared JSON still works" means **preserved and
+raw-editable — not automatically understood** by the editor or the renderer.
+
+*It follows from D4's own principle:* what is
+declared is what the system acts on; changing a declaration is an act, not an edit.
 
 ### D4 — What does the definition declare? (**reframed 2026-09-26: declare decisions, not fields**)
 
@@ -194,7 +242,7 @@ first would mean nCMS maintaining a validator that nDB is about to own — the t
 *Open:* does the declaration govern only entry-level fields, or document frontmatter too? Position: document
 frontmatter **is** language (D5 class 3), so it is not declared.
 
-### D5 — Shared facts vs language (**refined 2026-09-26 by David's raum.com answer**)
+### D5 — Shared facts vs language
 
 raum.com shares **images** between both language versions, but the **audio** (the TTS-rendered article) is
 **per language**. That names a third class, and the model is not shared-vs-local but **three kinds of
@@ -224,93 +272,106 @@ variants exist and only one is genuinely bilingual.
 
 ### D6 — The entry shape
 
-Today: `{name, slug, docs: {en: <whole document incl. its own facts>}}` — so facts are duplicated per variant.
-
-Proposed: facts on the entry, variants as `{frontmatter, body}`:
+The rule D5 implies is **one authority per value, and the document stays whole:**
 
 ```
 { _id, c_date, m_date, name, slug,
   facts: { customer, agency, year, date, categories: [...], cover: <ref>, involvement: {...} },
-  docs: { en: { frontmatter: { title, … }, body: "<!-- mb:main -->…" },
-          de: { frontmatter: { title, … }, body: "…" } } }
+  docs: { en: "<whole MD-Blocks source>", de: "<whole MD-Blocks source>" } }
 ```
 
-*Open:* facts flat on the entry vs inside a `facts` object; and whether a variant keeps any frontmatter at all
-(`title` says yes — it is the one field that is both, and the data already resolves it: the entry's `name` is
-the shared label, the variant's `title` is the local one).
+The rules that make it coherent:
 
-### D7 — Media: where the pool lives (**resolved by measurement 2026-09-26**)
+1. **Entry-level structured data owns every declared fact**, `title` included — a language map when localized
+   (`title: {en: "Hello nCMS", de: "Hallo nCMS"}`), a single value when shared.
+2. **A declared fact may not also have a competing authoritative value in a document's frontmatter.** One
+   value, one home. A document's frontmatter carries only what is *not* declared.
+3. **Each language's document stays whole MD-Blocks source.** The format's unit is a document; splitting it
+   into an object buys nothing rule 1 does not already buy.
+4. **Export assembles standalone per-language Markdown** on demand, merging the entry's facts back into the
+   frontmatter. The stored document is not the published artifact.
+5. **Raw JSON editing covers the whole entry; Markdown editing covers one document.** This answers blind spot
+   1: invariant #8 holds because the *entry* is the raw-editable unit, and no Markdown edit becomes an edit of
+   escaped JSON.
 
-This was framed as "which database owns the bucket". **It is not that question.** The old CMS's pool is
-independent of its buckets entirely:
+*What this costs:* the 142 imported documents carry their facts in frontmatter, so the importer must hoist them
+onto the entry, and `titleOf`'s frontmatter-parse fallback disappears. Both are the point.
 
-```
-database/storage/files/                             ← originals
-database/storage/cache/<variant>/<mediaId>.<ext>    ← one DIRECTORY per variant
-    big_avif/0BrlLZrU5UyY5FvZ.avif
-    big_jpg/…   big_webp/…   medium_avif/…   thumb_avif/…   thumb_cms/…
-```
+### D7 — Media: where the pool lives
 
-Keyed by media `_id`, one directory per variant, in **one shared root**. The `bucket` is a *field on the
-media record* — a label for the admin's Files screen; moving a media item between buckets moves no bytes.
-That is exactly what "buckets are labels, not directories" meant, and it is not nDB-shaped.
+The old CMS's pool is independent of its buckets: bytes in one shared root, `storage/files/` plus
+`storage/cache/<variant>/<mediaId>.<ext>`, with `bucket` only a label on the media record.
 
-nDB buckets offer none of what the pool needs: no variant concept, one blob per content hash under a
-hash-derived name, a root bound to a single database, and no cross-database read at all (measured — the
-resolver builds a path inside the *calling* database and fails with ENOENT). The pool needs a stable id per
-asset, many predictable variants, and one root outside every collection.
+**What the probe rules out is narrower than "nDB cannot back a pool".** Native cross-database *resolution*
+does not exist — a database cannot reach another database's bucket through its own handle. That is not the same
+as a shared pool being impossible. Two coherent options:
 
-**Proposed: the pool is CMS-side, as it was** — a filesystem pool the CMS owns, with nDB holding only
-references, and nDB's file buckets unused for content media. What `bucket` then means is open (D7a below).
+- **(a) A CMS-side filesystem pool**, as the old CMS had: the CMS owns bytes and layout, nDB holds only
+  references. Simple, and the variant cache keeps predictable paths a renderer can serve directly.
+- **(b) One dedicated media database**: it holds asset records (stable id, variant name → blob ref) *and* the
+  blobs in its own `_files/`; the CMS resolves an asset through that database's handle. No native
+  cross-database resolver is required.
 
-*Supporting measurement:* across the whole archive, **zero** media files appear in two different collections
-(561 in `works`, 79 in `audio_player`; the only overlap is `works` with its own trash). The old domain
-buckets permitted sharing; the content never needed it — which is why keeping the pool outside nDB costs
-nothing today.
+**The constraint that decides whether (b) works** (verified in source): **nDB's refcounting and GC are
+*database-local*.** `gc_buckets()` marks from `self.docs` and sweeps `self.base_dir/_files`; the counters live
+in `self.file_refs`. So the **asset records must live in the media database and must themselves hold the
+physical `bucket:hash.ext` refs** — a reference from a content collection would not protect a blob from GC.
+Get that right and (b) gets dedup and refcounted GC for free; get it wrong and the pool is swept.
 
-- **D7a (open, small):** does `bucket` survive as a label on the media record, or is it dropped?
-- **D7b (open, a build-contract question, not storage):** does the **renderer** resolve variants at build
-  time from the pool, or does the CMS pre-resolve them?
+**Favourite, stated:** **(b)**, because refcounted GC and dedup are exactly the pool bookkeeping the CMS should
+not hand-roll, and (a) means owning orphan cleanup forever. It is close, though — (a) wins if the variant
+cache's file paths matter to serving.
 
-### D8 — What is an entry with **zero** variants?
+*Weak evidence, flagged:* zero media files are shared between two collections in the whole archive (561 in
+`works`, 79 in `audio_player`; the overlap is `works` with its own trash). That describes the archive, **not
+what a general-purpose CMS should permit**.
 
-`writing` currently holds five live entries with no `docs` at all (four are step-2 test residue:
-`Validation Test`, `Validation Test 2`, `Round-trip probe`, `Boilerplate round-trip`) plus a duplicate
-entry. Under the no-fallback rule they have no URL — invisible but present.
+- **D7a:** does `bucket` survive as a label on the media record, or is it dropped?
+- **D7b:** does the **renderer** resolve variants at build time, or does the CMS pre-resolve? Still the real
+  question — and (b) makes resolution *more* explicitly the CMS's job, not less.
 
-Options: legal draft (shown in the list, marked), or invalid (rejected on write).
-**Proposed: legal draft, but visible.** Invisible-and-present is a silent failure. See D9 — the answer
-splits by collection kind.
+### D8 — Zero variants, or no body at all
 
-### D9 — Document collections and record collections (**found via the "all use-cases" lens**)
+`writing` holds **one** live entry (`Hello nCMS`, bilingual) and no bodyless entries at all — the apparent
+residue in its file (`Validation Test`, `Round-trip probe`, `Boilerplate round-trip`, empty shells) is already
+**tombstoned**. Reading the raw lines as documents miscounts it, because nDB applies deltas and tombstones
+rather than treating each line as a record; only `iter()`, `deletedIds()` or the API give the real state.
+Two different questions are in play, and only the first is a model question:
 
-`works_categories` in the old CMS is not a document collection at all: 9 entries of
-`{name, lang: {de, en}}` with **`sections: []`** — no body, ever. It is a **vocabulary**, referenced from
-documents by `_id` (`vars_tags.db` names the collection). It is also the *only* multilingual collection in
-the archive, and its one varying field is class 2.
+- **capability** — does this collection support or require a document body? A category is *complete* without
+  prose, and a renderer could build a page from structured fields alone. This is a **validation policy on the
+  collection**: it changes the editor and what a write may omit. It is not a storage shape.
+- **readiness** — is this entry ready to publish? A state, not a type, and orthogonal to the above.
 
-So the ambition bites here, and the current model does not cover it: every entry shape we have assumes a
-document, and the importer skipped this collection entirely.
+**Proposed:** a declared body policy (`required | optional | none`) and **no second storage model** — a
+bodyless entry is still an entry. Whether readiness needs a field at all is left open; it may be a renderer
+concern.
 
-**Proposed:** the collection declaration says whether its entries are **documents** (a body per language) or
-**records** (facts only). Both use the same three value kinds — a record's `name` is class 2, exactly like a
-document's `title`. One declaration, no second mechanism, and the raw editor already covers the rest.
+The case is designed from the vocabulary collection (D9), not from residue — there is no residue left in
+`writing`.
 
-*Consequence for D8:* a record collection is the legitimate version of "no variant". Zero body is normal
-there and abnormal in a document collection — the distinction D8 was missing.
+*This settles the brief's own blind spot 7:* a body policy is a capability, not a type.
+
+### D9 — The vocabulary case
+
+`works_categories`: 9 entries of `{name, lang: {de, en}}` with **`sections: []`** — no body, ever. Referenced
+from documents by `_id` (`vars_tags.db` names the collection). Also the only multilingual collection in the
+archive, and its one varying field is class 2.
+
+It needs **no new mechanism** under D8: the collection declares `body: none`, its entries are records, and its
+`name` is a localized fact like any other. The importer skipped it — an importer gap, not a model gap.
 
 ### D10 — What we want from nDB (all additive, non-breaking)
 
 1. **Implement `meta.json` `schemas` validation** (§2.3, already planned) — the platform's own roadmap.
 2. **Implement the `link`/nURI type** (§2.5) — media references are exactly the case it exists for.
-3. **`close()`** — measured: the `Database` prototype has no `close`, `destroy` or `dispose`. A handle
-   therefore stays open for the process's life and Windows refuses to rename or delete an open file
-   (`EPERM`). This already forced a design choice in nCMS (deleting a collection tombstones its declaration
-   instead of moving its folder) and it will block any purge or GC feature.
-4. **Resolve a link against a *named* database**, not only the caller's own — this is what would make D7(a)
+3. **Resolve a link against a *named* database**, not only the caller's own — this is what would make D7(b)
    native instead of CMS-side.
-5. Buckets declared upfront and dynamic creation restricted (§2.4.2's own intent) — only if D7 lands on a
+4. Buckets declared upfront and dynamic creation restricted (§2.4.2's own intent) — only if D7 lands on a
    shape that needs it.
+
+*(The wrapper's missing `close()` is not on this list: the native binding has it and it works. It is a
+one-line wrapper fix, filed as nDB #5.)*
 
 ---
 
@@ -342,23 +403,26 @@ That is why the raw editor is the universal floor rather than a debugging tool.
 
 ## 5. Where we suspect our own blind spot — attack these
 
-1. **D5 vs invariant #8 — "raw editing is always available for any document."** If facts move out of the
-   variant, then raw-editing a single variant no longer shows the whole document. The universal floor may
-   need to be raw editing of the **entry**, not of a variant. We have not worked this through.
-2. **D5 rests on one bilingual entry.** `title` differs, `date` and `tags` are identical — n=1. The
-   shared/local split is a reasonable inference, not a measurement.
-3. ~~D7 may be the wrong frame entirely.~~ **Resolved 2026-09-26** — it was the wrong frame. The pool is not
-   an nDB concern at all (D7), so "which database owns the bucket" was a question about nothing. What
-   remains is D7b, a build-contract question rather than a storage one.
-4. **D3 vs the set-editor we already shipped.** It writes definitions over HTTP today. If D3(b) holds, part
-   of that UI has to become a reviewed, previewed change rather than a Save.
-5. ~~We have verified nDB's *docs* but not run its behaviour.~~ **Closed 2026-09-26** — the probe in §2
-   measured the schema being ignored, the bucket scoping, the failed cross-database read and the absent
-   `close()`. The remaining unverified surface is the CLI (`ndb init` / `ndb config` / `ndb status`), which
-   we read but have not run.
-6. **The schema's own drift.** A schema in `meta.json` is a *second* copy of a shape that also exists in code
-   (`titleOf`, the admin's row renderer, the importer's mapping). If the schema is not the only source, it
+*(Two earlier entries are settled and now live in the decisions that answer them: raw editing vs. facts →
+D6 rule 5, and the document/record cut → D8.)*
+
+1. **D5 rests on one bilingual entry.** `title` differs, `date` and `tags` are identical — n=1. The split is
+   justified by principle rather than by the sample: translations *can* differ structurally, while a shared
+   value should have one authority. Keep the caveat; do not lean on the measurement.
+2. **D3 versus the set-editor already shipped.** It writes definitions over HTTP today. If D3(b) holds, part of
+   that UI has to become a reviewed, previewed change rather than a Save.
+3. **The definition's own drift.** A declaration in `meta.json` is a *second* copy of a shape that also exists
+   in code (`titleOf`, the admin's row renderer, the importer's mapping). If it is not the only source, it
    becomes a third thing to keep in sync — the failure mode `titleOf` already demonstrates.
-7. **D9's cut may be wrong.** It rests on one collection in one archive. Is "document vs record" a real
-   distinction, or is a record just a document whose body happens to be empty? If the latter, D9 is a flag
-   that should not exist — and "zero variants" has one meaning, not two.
+4. **No authority has been chosen for a value that currently lives in two places.** D6 rule 2 says a declared
+   fact may not also be authoritative in frontmatter — but the 142 imported documents *do* carry their facts
+   there, and `writing`'s variants carry `title` there. The rule needs a migration, and the migration needs a
+   rule for when the two disagree. That is D3a's ambiguous case arriving before any definition exists to
+   change.
+5. **D7's favourite is a judgement, not a measurement.** (b) is preferred for refcounted GC and dedup, but the
+   variant cache's predictable paths are a real serving advantage for (a). If serving paths matter more than
+   orphan cleanup, the choice flips.
+6. **The corpus is one archive.** Every measurement in §2 and every structural claim in §4a comes from a single
+   old CMS instance. That narrow base is why the all-use-cases lens keeps catching scope errors.
+7. **nDB's CLI is the remaining unverified surface.** `ndb init` / `ndb config` / `ndb status` were read, not
+   run. If `meta.json` handling differs in practice, D1's choice of file is affected.
