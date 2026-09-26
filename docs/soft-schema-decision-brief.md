@@ -72,7 +72,7 @@ Two consequences worth stating plainly:
 - **The bucket model is settled by measurement, not reading.** A cross-database file reference resolves to a
   *filesystem path built from the calling database's folder*, so it cannot work: nDB has no way to reach
   another database's files at all. D7 is therefore not a matter of preference for native resolution — there
-  is none to be had (see D9.4).
+  is none to be had (see D10.4).
 - **The Node API is flat where the Rust API is a bridge.** There is no `db.bucket(name)` in Node (it threw
   `TypeError`); the methods are `storeFile(bucket, name, data, mimeType)`, `getFile(bucket, hash, ext)`,
   `listFiles(bucket)`, `deleteFile`, `releaseFile`, `restoreFile`, `gcBuckets`. Documented as deliberate
@@ -162,20 +162,37 @@ runtime". Our set-editor currently edits `translatability` over HTTP as a side e
 
 **Proposed: (b).** It keeps the admin useful and keeps definition changes deliberate, which is nDB's intent.
 
-### D4 — What does the definition declare?
+### D4 — What does the definition declare? (**reframed 2026-09-26: declare decisions, not fields**)
 
-Proposed, as the minimum that removes an existing guess or ambiguity:
+nCMS is meant for **all use-cases**, not the old site and raum.com. Those are *evidence*, not specification.
+So the question is not "what is the field vocabulary" — that is per-use-case, and writing it down makes the
+declaration a second copy of the data. The question is narrower:
 
-1. **the display field** (what the list shows) — this deletes `titleOf()`'s three-way guess;
-2. **mandatory fields** — `c_date`, `m_date`, `name`, `slug` are CMS convention stamped in `store.js`; nDB
-   mandates only `_id` and the `_meta` line is a *store* header, not a document field;
-3. **the field vocabulary** with types — readable straight off the corpus (6 header ids, 7 discipline
-   labels, 4 record-level fields);
-4. **per field: shared or language-local**;
-5. **the language policy** — absorbing `translatability`.
+> **Declare only what the system must make a decision about. Everything else is free JSON.**
 
-*Open within D4:* does the definition govern only entry-level fields, or document frontmatter too? Position:
-document frontmatter **is** language (see D5), so it is not schema'd.
+That yields three declarations, all small:
+
+1. **which field is the display field** — deletes `titleOf()`'s three-way guess;
+2. **the language set** — absorbing `translatability`;
+3. **per field, the kind** (shared | per-language) — **only for fields that vary**, and the kind is
+   **declared, never inferred from the field's meaning**.
+
+Point 3 is the correction that generality forces. "Images are shared, audio is per-language" is true of
+raum.com and false in general: a screenshot of a German UI is a per-language *image*. If the kind were
+hardcoded by role, the model would break on the second use-case. The role tells you nothing; the collection
+says.
+
+**What this buys over the original proposal.** Adding an ordinary field requires **no** declaration edit at
+all — stronger than "entries are not touched", because the declaration isn't touched either. And
+**compaction shrinks in proportion to what is declared**: three-ish fields per collection, not a field
+vocabulary. A retired declared field is still hygiene rather than correctness, because undeclared means free
+JSON, which the raw editor still shows.
+
+**Rejected as the tail:** a full typed field schema. Type validation is nDB's §2.3 eventually; doing it here
+first would mean nCMS maintaining a validator that nDB is about to own — the third-copy problem of §5.
+
+*Open:* does the declaration govern only entry-level fields, or document frontmatter too? Position: document
+frontmatter **is** language (D5 class 3), so it is not declared.
 
 ### D5 — Shared facts vs language (**refined 2026-09-26 by David's raum.com answer**)
 
@@ -262,9 +279,27 @@ nothing today.
 entry. Under the no-fallback rule they have no URL — invisible but present.
 
 Options: legal draft (shown in the list, marked), or invalid (rejected on write).
-**Proposed: legal draft, but visible.** Invisible-and-present is a silent failure.
+**Proposed: legal draft, but visible.** Invisible-and-present is a silent failure. See D9 — the answer
+splits by collection kind.
 
-### D9 — What we want from nDB (all additive, non-breaking)
+### D9 — Document collections and record collections (**found via the "all use-cases" lens**)
+
+`works_categories` in the old CMS is not a document collection at all: 9 entries of
+`{name, lang: {de, en}}` with **`sections: []`** — no body, ever. It is a **vocabulary**, referenced from
+documents by `_id` (`vars_tags.db` names the collection). It is also the *only* multilingual collection in
+the archive, and its one varying field is class 2.
+
+So the ambition bites here, and the current model does not cover it: every entry shape we have assumes a
+document, and the importer skipped this collection entirely.
+
+**Proposed:** the collection declaration says whether its entries are **documents** (a body per language) or
+**records** (facts only). Both use the same three value kinds — a record's `name` is class 2, exactly like a
+document's `title`. One declaration, no second mechanism, and the raw editor already covers the rest.
+
+*Consequence for D8:* a record collection is the legitimate version of "no variant". Zero body is normal
+there and abnormal in a document collection — the distinction D8 was missing.
+
+### D10 — What we want from nDB (all additive, non-breaking)
 
 1. **Implement `meta.json` `schemas` validation** (§2.3, already planned) — the platform's own roadmap.
 2. **Implement the `link`/nURI type** (§2.5) — media references are exactly the case it exists for.
@@ -283,6 +318,25 @@ Options: legal draft (shown in the list, marked), or invalid (rejected on write)
 
 The URL contract and redirect map; the media variant menu's migration to nMedia; the renderer's output;
 the block editor's design. All live in the plan (§11, §13).
+
+---
+
+## 4a. The 80% boundary — what we deliberately do not model
+
+The ambition is **all use-cases**; the method is **the 80% done excellently**, because attempting everything
+collides with excellence and performance. So the tail is named rather than stumbled into. **None of these get
+model features. All of them are served by the raw-editing floor and plain JSON.**
+
+- locales beyond a language code (regions, dialects) — declare more codes; no new mechanism;
+- per-field permissions, visibility, or workflow/approval states;
+- typed validation of every field (nDB §2.3's job, eventually);
+- real relations/joins between collections — the old CMS's tags are a *soft* reference by `_id`;
+- unbounded recursion in the document format (the old editor was deliberately bounded to three levels);
+- versioning or history of documents;
+- anything the renderer needs that the store should not know about.
+
+The contract that makes the 80% safe: **if it is not declared, it still works — as JSON, editable by hand.**
+That is why the raw editor is the universal floor rather than a debugging tool.
 
 ---
 
@@ -305,3 +359,6 @@ the block editor's design. All live in the plan (§11, §13).
 6. **The schema's own drift.** A schema in `meta.json` is a *second* copy of a shape that also exists in code
    (`titleOf`, the admin's row renderer, the importer's mapping). If the schema is not the only source, it
    becomes a third thing to keep in sync — the failure mode `titleOf` already demonstrates.
+7. **D9's cut may be wrong.** It rests on one collection in one archive. Is "document vs record" a real
+   distinction, or is a record just a document whose body happens to be empty? If the latter, D9 is a flag
+   that should not exist — and "zero variants" has one meaning, not two.
