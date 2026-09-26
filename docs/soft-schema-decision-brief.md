@@ -236,26 +236,31 @@ harmless:
   explicit* operation, and compaction only reclaims the log history that removal leaves behind. Deleting a
   declaration must never imply deleting data.
 
-**Minimal first implementation — the rule:** *a definition change never rewrites or deletes entry data.*
-Non-conflicting changes apply; conflicting ones are refused **in whole**, with a machine-readable account of
-what conflicts. Explicit conversion is a separate feature and **not built now** — but its input is the refusal
-payload, so nothing here is a dead end.
+**Minimal first implementation — one rule, applied to every change:**
+
+> **A definition change never rewrites or coerces a value, and applies only if every existing value stays
+> readable under the new definition.** Otherwise it is refused *in whole*, with a machine-readable account of
+> what conflicts. Explicit conversion is a separate feature and **not built now** — but its input is the refusal
+> payload, so the deferral is not a dead end.
+
+**"Readable" is the whole test, and it is what makes *conversion* the right word.** A change that would require
+one value to become another is conversion even when the target is uniquely derivable — cardinality is
+irrelevant, and the absence of ambiguity does not make it free.
 
 | change | verdict |
 |---|---|
-| add a declared field | **applies** — report coverage (how many entries hold no value) |
-| change the display field | **applies** — a projection, not a reinterpretation; report which entries would show blank |
-| add a language | **applies** — report how many entries have no variant in it (a missing variant is "no URL", per B2) |
-| remove a language | **refused** if *any* entry has content in it; names the count and the entries |
-| retire a declared field | **applies**, and touches no data — the field becomes undeclared free JSON |
+| add or re-add a declared field | **applies** only if the values already present for it — free JSON from raw editing, or left by an earlier retirement — are readable under the declared kind. A string where a per-language map is expected is **not**. Reports coverage either way |
+| change the display field | **applies** — values are untouched and still readable; only the projection moves. Reports which entries would show blank |
+| add a language | **applies** — every existing value reads the same. Reports how many entries have no variant in it |
+| remove a language | **refused** if *any* entry has content in it — a document variant in that language, **or** a per-language fact value. It becomes unreadable, which is the test |
+| retire a declared field | **applies**, and touches no data: the field becomes undeclared free JSON, which the invariant already permits as preserved-but-uninterpreted |
+| `shared → per-language` or `per-language → shared` | **refused** if *any* entry holds a value in that field. No cardinality exception |
 | coverage gaps | never a conflict; reported, never refused |
-| `shared → per-language` | **applies** only when exactly one language is declared (the value's language is then unambiguous); otherwise **refused**, naming the entries that hold a value |
-| `per-language → shared` | **refused** if any entry holds values in *more than one* language — collapsing them needs a choice and there is no correct default. Warns when different entries' values come from different languages |
 
 Three invariants, and they are what make "soft" safe:
 
-1. **No definition change writes to an entry.** Not even to normalise. The only writer of entry data is a
-   write to that entry.
+1. **No definition change writes to, rewrites or coerces an entry value.** Not even to normalise. The only
+   writer of entry data is a write to that entry.
 2. **A refusal is atomic** — nothing applies, the definition is unchanged.
 3. **A refusal is specific**: entry ids, field, languages, and a stable conflict code. A refusal that says only
    "conflict" is a bug in this feature, not an acceptable outcome.
@@ -581,16 +586,18 @@ Four things this shape asserts, each following from a decision above:
 - **One reference form, in facts and in documents alike**: `media/<asset id>/<filename>`. MD-Blocks
   destinations are *paths*, so a document cannot use a bare id; using the path form everywhere means one
   resolver instead of two. This is a proposal, and it is what D7's resolution story has to serve.
-- **The cover is a fact and is not repeated as a body block**, and neither is the audio. One authority, and the
-  renderer decides placement (hero, list thumbnail, OG image). Same reasoning as audio in D5.
-  *(Open: whether author-placed cover in the body should also be allowed. Currently no — it would recreate the
-  two-authority problem the fact exists to remove.)*
+- **A fact and a body reference are separate uses, not competing authorities.** `facts.cover` is the entry's
+  cover — list thumbnail, OG image — and a media block in the body is a rendered image in the article. The same
+  asset appearing in both is ordinary and allowed. D6 rule 2 constrains the **values of a declared fact**; it
+  says nothing about references to an asset. Placing a fact is the renderer's job, and an author may
+  independently reference the same asset in the body.
 
 ### How the editor obtains each value
 
 | editor shows | source |
 |---|---|
-| which fields exist, and one input vs. N side-by-side inputs | the definition's `fields[].kind` — **the form layout is derived, not hardcoded** |
+| one value vs. one value per language | the definition's `fields[].kind` — it determines the **localization layout**, not a widget type |
+| a declared field with no specialised editor | raw JSON — declaring a field never promises a purpose-built editor for it |
 | which languages are selectable | `cms.languages` |
 | a shared value | `entry.facts[field]` |
 | a per-language value | `entry.facts[field][lang]`; an absent language shows as a marked gap with an affordance to create it, not as blank |
@@ -607,7 +614,7 @@ Four things this shape asserts, each following from a decision above:
 | a per-language value | `entry.facts[field][lang]` — no variant scanning, no frontmatter parsing |
 | the article body | `entry.docs[lang]`, through the MD-Blocks renderer |
 | media in facts *and* in the body | the same resolver: it takes `media/<id>/<filename>`, extracts the id, and returns URLs from the variant menu |
-| a page for `de` | exists only if `docs.de` exists — a missing variant is "no URL", no fallback (B2) |
+| a page for `de` | for **document-backed** pages, only if `docs.de` exists — a missing variant is "no URL", no fallback (B2). Bodyless collections have no `docs` at all, and whether they produce a page is the renderer's own business (D8) |
 | a standalone MD-Blocks export | **assembles** one: the facts for that language are merged into the document's frontmatter. The stored document is not the published artifact (D6 rule 4) |
 
 The payoff in one line: **the renderer needs the definition and one entry, and reads every value by path. No
