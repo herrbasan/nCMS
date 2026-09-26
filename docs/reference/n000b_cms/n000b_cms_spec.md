@@ -179,7 +179,27 @@ So the current tree depth is ~3 levels: `section → group → block | columns �
 ## 7. Data storage & backend
 
 - `html_fdar/database/data/collections/<collectionId>.json` — one JSON object **per line** (a whole doc on one
-  line). Verified: `DvSm43mylqudDQg9.json` = `works` (141 docs), `trash.json` = trash.
+  line), and **no header line**: line 1 is already a document, unlike the `_meta` line nDB itself writes.
+  Verified: `DvSm43mylqudDQg9.json` = `works` (**142** docs), `RcGiBpJZRSRrSr0i.json` = `audio_player` (2),
+  `8CyGWOhE6abpWkkL.json` = `works_categories` (9), `trash.json` = trash (26).
+- `html_fdar/database/data/admin/` holds the CMS's **own registries**, and they are the whole of what is
+  stored about the tables: `dbs_db.json` (tables), `buckets_db.json` (buckets), `files_db.json` (the media
+  pool index, 767 KB), `users_db.json`. **A table definition is only `{name, c_date, m_date, _id}`** — no
+  fields and no languages; a bucket's is the same minus dates. So the per-table shape the editor renders —
+  the fixed Header and its variables, and whether the table is multilingual — is **code, not data**
+  (`editor_page_default`, below). **Language was never a fact stored in a document.** Confirmed by David
+  2026-09-26: the old CMS had no database-level multi-language support; it was a property of the table's
+  definition.
+- **Multilingual storage appears exactly once in the whole archive.** Scanning every collection for
+  language-keyed values: the only ones are the 11 `works_categories` records that carry
+  `lang: {de: "Selektion", en: "Featured"}` beside a shared `name: "tag_featured"` (9 live + 2 in trash).
+  `works` (142 documents) and `audio_player` (2) contain **zero** — and no block's `data` is ever a map.
+  So that one field is the only evidence of the pattern, and the archive says nothing about how multilingual
+  *prose* was stored, because no multilingual content table ever existed.
+- **The record carries facts; the tree carries content.** A `works` document has `name`, `customer`, `year`,
+  `date` (a timestamp) **at the top level, outside `sections`** — while the fixed Header's variables repeat
+  most of them for editing. So the old CMS had already drawn that line; `agency`, `location`, `categories`,
+  `cover` and `involvement` exist only inside the tree.
 - Media pool + caches: `html_fdar/database/storage/cache/`; generated variants live beside the reference.
 - Backend: Express (`Server/index.js`), storage backend switch via `DATABASE` env (`mongo`/`nedb`; plan intends
   `ndb`), media via sharp (images) + ffmpeg (video snaps). Endpoint contract `/col/*` must stay stable.
