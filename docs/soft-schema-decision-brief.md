@@ -318,6 +318,12 @@ in `self.file_refs`. So the **asset records must live in the media database and 
 physical `bucket:hash.ext` refs** — a reference from a content collection would not protect a blob from GC.
 Get that right and (b) gets dedup and refcounted GC for free; get it wrong and the pool is swept.
 
+**Second constraint, pending upstream.** With (b), the pool's orphan cleanup *is* nDB's GC — and nDB's GC
+currently counts a failed delete as a success and discards listing errors (nDB #4). Orphan blobs would then
+accumulate silently instead of being reported. (a) carries no such dependency, because the CMS owns its own
+cleanup. This does not change the favourite, but it belongs in the comparison rather than being discovered
+later.
+
 **Favourite, stated:** **(b)**, because refcounted GC and dedup are exactly the pool bookkeeping the CMS should
 not hand-roll, and (a) means owning orphan cleanup forever. It is close, though — (a) wins if the variant
 cache's file paths matter to serving.
