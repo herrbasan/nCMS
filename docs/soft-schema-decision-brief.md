@@ -236,15 +236,38 @@ harmless:
   explicit* operation, and compaction only reclaims the log history that removal leaves behind. Deleting a
   declaration must never imply deleting data.
 
-**Proposed:** a definition change is a *diff with effects* — it names, per existing entry, what would become
-ambiguous or orphaned, and it refuses to guess. The ambiguous cases are handed to a human (or an LLM) as an
-explicit conversion rather than resolved by default. And "undeclared JSON still works" means **preserved and
-raw-editable — not automatically understood** by the editor or the renderer.
+**Minimal first implementation — the rule:** *a definition change never rewrites or deletes entry data.*
+Non-conflicting changes apply; conflicting ones are refused **in whole**, with a machine-readable account of
+what conflicts. Explicit conversion is a separate feature and **not built now** — but its input is the refusal
+payload, so nothing here is a dead end.
 
-*It follows from D4's own principle:* what is
-declared is what the system acts on; changing a declaration is an act, not an edit.
+| change | verdict |
+|---|---|
+| add a declared field | **applies** — report coverage (how many entries hold no value) |
+| change the display field | **applies** — a projection, not a reinterpretation; report which entries would show blank |
+| add a language | **applies** — report how many entries have no variant in it (a missing variant is "no URL", per B2) |
+| remove a language | **refused** if *any* entry has content in it; names the count and the entries |
+| retire a declared field | **applies**, and touches no data — the field becomes undeclared free JSON |
+| coverage gaps | never a conflict; reported, never refused |
+| `shared → per-language` | **applies** only when exactly one language is declared (the value's language is then unambiguous); otherwise **refused**, naming the entries that hold a value |
+| `per-language → shared` | **refused** if any entry holds values in *more than one* language — collapsing them needs a choice and there is no correct default. Warns when different entries' values come from different languages |
 
-### D4 — What does the definition declare? (**reframed 2026-09-26: declare decisions, not fields**)
+Three invariants, and they are what make "soft" safe:
+
+1. **No definition change writes to an entry.** Not even to normalise. The only writer of entry data is a
+   write to that entry.
+2. **A refusal is atomic** — nothing applies, the definition is unchanged.
+3. **A refusal is specific**: entry ids, field, languages, and a stable conflict code. A refusal that says only
+   "conflict" is a bug in this feature, not an acceptable outcome.
+
+The refusal reuses the existing envelope — `{status:false, error:"definition_conflict", message, detail}` with
+`detail.conflicts: [{entry, field, code}]`. That is deliberate: error codes are a stable contract, the Chat app
+can act on them, and **the later conversion feature consumes exactly this payload** instead of needing new
+machinery.
+
+*It follows from D4's own principle:* what is declared is what the system acts on; changing a declaration is an act, not an edit.
+
+### D4 — What does the definition declare?
 
 nCMS is meant for **all use-cases**, not the old site and raum.com. Those are *evidence*, not specification.
 So the question is not "what is the field vocabulary" — that is per-use-case, and writing it down makes the
@@ -479,3 +502,113 @@ D6 rule 5, and the document/record cut → D8.)*
    old CMS instance. That narrow base is why the all-use-cases lens keeps catching scope errors.
 7. **nDB's CLI is the remaining unverified surface.** `ndb init` / `ndb config` / `ndb status` were read, not
    run. If `meta.json` handling differs in practice, D1's choice of file is affected.
+
+---
+
+## 6. Worked example — one definition, one bilingual entry (**proposal**)
+
+The real Westenergie entry, reshaped by D1/D4/D5/D6. The identifiers, asset ids, filenames and columns block
+are the actual ones. Two things are illustrative: the **body is trimmed to its first section**, and the
+**German side is invented** — the corpus is en-only, so a `de` title, a `de` heading and `de` audio are
+supplied to show the shape.
+
+### The collection definition — `data/works/meta.json`
+
+```json
+{
+  "version": 1,
+  "created": 1789200346,
+  "buckets": ["media"],
+
+  "schemas": { "entry": { "fields": { "cover": { "type": "link" } } } },
+
+  "cms": {
+    "languages": ["en", "de"],
+    "body": "optional",
+    "display": "name",
+    "fields": {
+      "customer": { "kind": "shared" },
+      "year":     { "kind": "shared" },
+      "cover":    { "kind": "shared" },
+      "title":    { "kind": "per-language" },
+      "audio":    { "kind": "per-language" }
+    }
+  }
+}
+```
+
+`version`, `created` and `buckets` are nDB's own keys as `ndb init` writes them. `schemas` is nDB's key for
+storage types and is **currently inert** (D1/D2) — shown only to make the namespacing visible. `cms` is ours and
+is read by nothing else.
+
+### The entry
+
+```json
+{
+  "_id": "bs82iSsY4ItiGafr",
+  "c_date": 1789200346161,
+  "m_date": 1789200346161,
+  "name": "Westenergie Web APP",
+  "slug": "westenergie-web-app",
+
+  "facts": {
+    "customer": "Westenergie",
+    "year": 2021,
+    "cover": "media/znLiGMaZF3pvwS8t/westenergie_webapp.mp4_snap_00007.png",
+    "title": {
+      "en": "Westenergie Web APP",
+      "de": "Westenergie Web-App"
+    },
+    "audio": {
+      "en": "media/aa11bb22ccddeeff/westenergie-en.mp3",
+      "de": "media/ff11ee22ddccbbaa/westenergie-de.mp3"
+    }
+  },
+
+  "docs": {
+    "en": "<!-- mb:main -->\n\n<!-- mb:block label=\"Headline\" -->\n# Screenshots\n<!-- mb:/block -->\n\n<!-- mb:columns label=\"3 Media Columns\" -->\n<!-- mb:col -->\n![Screenshot 01](media/IsFI4SLnOrI8npka/westenergie_webapp.mp4_snap_00001.png)\n<!-- mb:col -->\n![Screenshot 08](media/DLWtawgF6PCBlBfs/westenergie_webapp.mp4_snap_00008.png)\n<!-- mb:col -->\n![Screenshot 09](media/smxH2cuKzlur008C/westenergie_webapp.mp4_snap_00009.png)\n<!-- mb:/columns -->\n",
+    "de": "<!-- mb:main -->\n\n<!-- mb:block label=\"Headline\" -->\n# Ansichten\n<!-- mb:/block -->\n\n<!-- mb:columns label=\"3 Media Columns\" -->\n<!-- mb:col -->\n![Screenshot 01](media/IsFI4SLnOrI8npka/westenergie_webapp.mp4_snap_00001.png)\n<!-- mb:col -->\n![Screenshot 08](media/DLWtawgF6PCBlBfs/westenergie_webapp.mp4_snap_00008.png)\n<!-- mb:col -->\n![Screenshot 09](media/smxH2cuKzlur008C/westenergie_webapp.mp4_snap_00009.png)\n<!-- mb:/columns -->\n"
+  }
+}
+```
+
+Four things this shape asserts, each following from a decision above:
+
+- **Identity is top-level and shared**: `_id`, `name`, `slug`, dates (B2). `name` is the language-neutral label;
+  `title` is the localized heading. Both exist because the corpus already distinguishes them.
+- **The stored document carries no `title`.** It has no frontmatter at all. `title` is a declared fact, so
+  frontmatter carrying it would be a second authority (D6 rule 2). Export merges the facts back in — see below.
+- **One reference form, in facts and in documents alike**: `media/<asset id>/<filename>`. MD-Blocks
+  destinations are *paths*, so a document cannot use a bare id; using the path form everywhere means one
+  resolver instead of two. This is a proposal, and it is what D7's resolution story has to serve.
+- **The cover is a fact and is not repeated as a body block**, and neither is the audio. One authority, and the
+  renderer decides placement (hero, list thumbnail, OG image). Same reasoning as audio in D5.
+  *(Open: whether author-placed cover in the body should also be allowed. Currently no — it would recreate the
+  two-authority problem the fact exists to remove.)*
+
+### How the editor obtains each value
+
+| editor shows | source |
+|---|---|
+| which fields exist, and one input vs. N side-by-side inputs | the definition's `fields[].kind` — **the form layout is derived, not hardcoded** |
+| which languages are selectable | `cms.languages` |
+| a shared value | `entry.facts[field]` |
+| a per-language value | `entry.facts[field][lang]`; an absent language shows as a marked gap with an affordance to create it, not as blank |
+| the list label | `entry.name`, because `display: "name"` — `titleOf`'s three-way guess is gone |
+| the body being edited | `entry.docs[lang]`, as Markdown, for **one language at a time** |
+| the whole entry, raw | the entry object as JSON — the universal floor, per invariant #8 |
+
+### How the renderer obtains each value
+
+| renderer needs | source |
+|---|---|
+| the language set, the body policy | the definition's `cms` key |
+| a shared value | `entry.facts[field]` — read directly, nothing parsed |
+| a per-language value | `entry.facts[field][lang]` — no variant scanning, no frontmatter parsing |
+| the article body | `entry.docs[lang]`, through the MD-Blocks renderer |
+| media in facts *and* in the body | the same resolver: it takes `media/<id>/<filename>`, extracts the id, and returns URLs from the variant menu |
+| a page for `de` | exists only if `docs.de` exists — a missing variant is "no URL", no fallback (B2) |
+| a standalone MD-Blocks export | **assembles** one: the facts for that language are merged into the document's frontmatter. The stored document is not the published artifact (D6 rule 4) |
+
+The payoff in one line: **the renderer needs the definition and one entry, and reads every value by path. No
+heuristic anywhere.** That is what `titleOf` was standing in for.
