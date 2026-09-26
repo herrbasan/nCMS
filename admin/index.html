@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="color-scheme" content="light dark">
+    <!-- Content Security Policy — 'unsafe-eval' is required by NUI page scripts.
+         img-src must allow data: — nui-list draws its own sort caret as an inline data:image/svg+xml
+         URI, and under the boilerplate's stricter policy that control silently loses its icon. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+    <title>nCMS</title>
+    <!-- Core NUI CSS Variables and Components -->
+    <link rel="stylesheet" href="/nui/css/nui-theme.css">
+    <!-- Addons need BOTH their JS import and their CSS link -->
+    <link rel="stylesheet" href="/nui/css/modules/nui-list.css">
+    <link rel="stylesheet" href="/nui/css/modules/nui-code-editor.css">
+    <!-- Development only — the debug validator. Zero production cost is achieved by NOT importing
+         it, so remove these two lines for production. Note: the cheatsheet documents a ?nui-debug
+         query param that auto-loads this; nothing reads that param (the Playground imports it
+         explicitly), so it is imported explicitly here too. -->
+    <link rel="stylesheet" href="/nui/css/modules/nui-debug.css">
+    <script type="module" src="/nui/lib/modules/nui-debug.js"></script>
+    <!-- App Specific CSS -->
+    <link rel="stylesheet" href="css/main.css">
+    <style>
+        /* Prevent layout shifts by hiding app until upgraded and ready */
+        body { margin: 0; padding: 0; overflow: hidden; }
+        nui-app:not(.nui-ready) { display: none; }
+        nui-loading:not(.active) { display: none; }
+    </style>
+    <!-- Main App Logic -->
+    <script type="module" src="js/app.js"></script>
+</head>
+<body>
+    <nui-loading mode="bar"></nui-loading>
+
+    <nui-app sidebar-width="20rem" content-width="60rem" content-min-width="50rem">
+        <nui-skip-links></nui-skip-links>
+
+        <nui-app-header>
+            <div slot="left">
+                <nui-button data-action="toggle-sidebar" variant="icon">
+                    <button type="button" aria-label="Toggle navigation">
+                        <nui-icon name="menu">☰</nui-icon>
+                    </button>
+                </nui-button>
+                <h1>nCMS</h1>
+            </div>
+            
+            <div slot="right">
+                <nui-button data-action="toggle-theme" variant="icon">
+                    <button type="button" aria-label="Toggle colour scheme">
+                        <nui-icon name="brightness">⛭</nui-icon>
+                    </button>
+                </nui-button>
+            </div>
+        </nui-app-header>
+
+        <!-- Left Sidebar: navigation. The link list is the sidebar's inner element directly —
+             no <nav> wrapper. A sidebar's list IS the navigation, and it is a fold list;
+             nui-sidebar forces that itself, so "fold" here is explicit but not a conflict. -->
+        <nui-sidebar behavior="primary" id="nav-sidebar">
+            <nui-link-list mode="fold" id="main-navigation" aria-label="Collections">
+                <!-- Loaded via JS -->
+            </nui-link-list>
+        </nui-sidebar>
+
+        <nui-content>
+            <nui-main>
+                <!-- Dynamic pages loaded here via the router -->
+            </nui-main>
+        </nui-content>
+    </nui-app>
+</body>
+</html>

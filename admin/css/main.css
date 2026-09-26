@@ -1,0 +1,62 @@
+/* nCMS admin styles.
+ *
+ * Only our own elements are styled. NUI components carry their own presentation, and reaching
+ * into them would fight the design system.
+ *
+ * The one exception is .content-col, and it is not an exception really: that class is the
+ * wrapper the router generates for a route type (`content-${type}`), and the theme styles its
+ * own equivalents the same way (`nui-main > .content-page`). It is the supported hook for
+ * "give my route's wrapper the shell's height".
+ */
+
+/* nui-main is absolutely positioned with inset 0, so it has a definite height. The wrapper the
+ * router creates for a custom type is a plain block, so the height has to be passed down before
+ * a virtualized list can size itself. */
+.content-col {
+	display: flex;
+	flex-direction: column;
+	block-size: 100%;
+}
+
+/* nui-list fills its container via absolute positioning, so the container needs
+ * position: relative and a definite height — neither of which it can supply itself. */
+.cms-pane {
+	position: relative;
+	flex: 1;
+	min-block-size: 0;
+}
+
+.cms-row {
+	display: flex;
+	align-items: center;
+	gap: var(--nui-space);
+	block-size: 100%;
+	padding-inline: var(--nui-space);
+}
+
+.cms-row-main {
+	flex: 1;
+	min-inline-size: 0;
+}
+
+.cms-row-title {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.cms-row-snippet,
+.cms-row-meta {
+	font-size: var(--font-size-small);
+	color: var(--text-color-dim);
+}
+
+.cms-row-snippet {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.cms-row-meta {
+	white-space: nowrap;
+}
