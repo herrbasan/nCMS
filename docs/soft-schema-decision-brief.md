@@ -257,7 +257,16 @@ value that would merely need wrapping.
 | remove a language | **refused** if *any* entry has content in it — a document variant, or a value under a declared per-language field — `language_in_use` |
 | retire a declared field | **applies**, and touches no data: the field becomes undeclared free JSON |
 | `shared ↔ per-language` on a field holding values | **refused**, `declaration_over_values`. No cardinality exception |
+| `body` → `none` while documents exist | **refused**, `body_not_allowed` — applying it would invalidate those entries on arrival |
+| `body` → `required` while any entry has no document | **refused**, `body_required` — same reason, in the other direction |
+| `body` → `optional`, or a policy change entries already satisfy | **applies** |
 | coverage gaps | never a conflict; reported, never refused |
+
+**This strictness is deliberately conservative, and temporary.** Refusing *any* declaration change over
+existing values is the safe choice while no conversion path exists: it cannot reinterpret anything, and it
+cannot guess. It is **not an inherent requirement of the model.** Once explicit conversion exists, the cases
+that are unambiguously derivable — a value under a single declared language, say — become mechanical
+conversions instead of refusals. Treat the strictness as a placeholder for that feature, not as the design.
 
 Three invariants, and they are what make "soft" safe:
 
@@ -626,10 +635,11 @@ heuristic anywhere.** That is what `titleOf` was standing in for.
 ### Added: structural enforcement on entry writes
 
 With a definition present, entry saves are checked against the declared **shape** — which languages a
-per-language value and a document variant may be keyed by, and the body policy (`required | optional | none`).
-A shared field's value is unchecked, because it may be arbitrary JSON. Missing translations stay allowed:
-a variant that does not exist is "no URL" (B2), not an error. Refusals are `400 invalid_entry` with
-`detail.problems`, naming the field and the code.
+per-language value and a document variant may be keyed by, which value is a whole document, and the body
+policy (`required | optional | none`). A shared field's value is unchecked, because it may be arbitrary JSON.
+A document variant must be a **string**: a number, object or null is never a whole Markdown document, and
+saying so needs no parser. Missing translations stay allowed — a variant that does not exist is "no URL"
+(B2), not an error. Refusals are `400 invalid_entry` with `detail.problems`, naming the field and the code.
 
 ### Added: two behaviours worth knowing
 
@@ -637,4 +647,8 @@ a variant that does not exist is "no URL" (B2), not an error. Refusals are `400 
   `{de: …, en: …}`. Semantically identical, but any comparison of stored objects must be by value, and the raw
   editor will show keys in a different order than they were typed.
 - **A defined collection's label comes from the declared display field**, taking the first declared language
-  that holds a value for a per-language field. A legacy collection keeps the old heuristic unchanged.
+  that holds a value for a per-language field. When an entry has **no** value for that field the summary
+  reports `displayMissing` (naming the field) with `title: null` — it does not quietly fall back to the
+  entry's name, and the row shows "no <field>" with the id still in its meta line. A definition with no
+  display field configured falls back to the entry's `name`, which is its identity field rather than a guess
+  about which fact to read; a legacy collection keeps the old heuristic unchanged.

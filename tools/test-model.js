@@ -16,8 +16,10 @@
 //   4. the declared display field drives the list label;
 //   5. a definition change is refused, in whole, whenever it would reinterpret values already there —
 //      judged by what the definition *declares*, never by inspecting a value's shape;
-//   6. an invalid definition is rejected *before* a collection is created for it;
-//   7. writing the definition is atomic, so a failure cannot leave it truncated.
+//   6. the body policy is checked against existing entries, and a document variant must be text;
+//   7. an invalid definition is rejected *before* a collection is created for it;
+//   8. writing the definition is atomic, so a failure cannot leave it truncated; and a configured
+//      display field with no value is reported as missing rather than masked by the entry's name.
 //
 // Re-runnable. It manages its own entries by name and never deletes its collection.
 
@@ -241,6 +243,16 @@ async function main() {
 	check('the display field drives the list label', label === 'Westenergie',
 		`title = ${show(label)} (name is ${show(ENTRY_NAME)})`);
 
+	// 8b. A configured display field with no value is reported as missing, never masked by the name.
+	const missing = await putDefinition({ ...held, display: 'credit' });
+	check('pointing the display field at a field with no value applies', missing.status === 200, show(missing.payload));
+	const row = (await call('GET', `${collectionRoute()}/entries`)).payload.data.find((e) => e._id === ENTRY_ID);
+	check('the missing label is explicit, not the entry name',
+		row.title === null && row.displayMissing === 'credit', show(row));
+	check('and the entry id is still available', row._id === ENTRY_ID);
+	check('the display field restores', (await putDefinition({ ...missing.payload.data, display: 'customer' })).status === 200);
+	held = await definition();
+
 	// 9. A shared field may hold arbitrary JSON — including an object keyed by language codes, which
 	// is exactly what key-name guessing would have misread as a language map.
 	const withCredit = await readEntry();
@@ -277,6 +289,15 @@ async function main() {
 		{ ...(await readEntry()), facts: { ...(await readEntry()).facts, audio: { en: 'media/x.mp3', it: 'media/y.mp3' } } },
 		'undeclared_language');
 
+	// A document variant is text. A number, object or null is never a Markdown document, and saying so
+	// needs no parser.
+	await rejectsEntry('docs.en as a number',
+		{ ...(await readEntry()), docs: { ...(await readEntry()).docs, en: 42 } }, 'not_a_document');
+	await rejectsEntry('docs.en as null',
+		{ ...(await readEntry()), docs: { ...(await readEntry()).docs, en: null } }, 'not_a_document');
+	await rejectsEntry('docs.de as an object',
+		{ ...(await readEntry()), docs: { ...(await readEntry()).docs, de: { text: 'not a document' } } }, 'not_a_document');
+
 	// 12. Retiring a field touches no data, and re-declaring it is the same rule as adding one.
 	const { customer, ...withoutCustomer } = held.fields;
 	const retired = await putDefinition({ ...held, fields: withoutCustomer });
@@ -288,7 +309,29 @@ async function main() {
 		{ ...retired.payload.data, fields: { ...withoutCustomer, customer: { kind: 'shared' } } },
 		show(await readEntry()), 'declaration_over_values');
 
-	// 13. The definition file is always parseable and no temporary is left behind.
+	// 13. The body policy is checked against existing entries before it is applied.
+	held = await definition();
+	await refuses('body → none while a document exists', { ...held, body: 'none' },
+		show(await readEntry()), 'body_not_allowed');
+
+	// An entry with no document is legal while the policy is `optional`…
+	const noBody = await call('POST', `${collectionRoute()}/entries`, {
+		name: 'No document', slug: 'no-document', facts: { customer: 'Nobody' }
+	});
+	check('an entry without a document is legal under "optional"', noBody.payload.status === true, show(noBody.payload));
+
+	// …so requiring one now would invalidate it the moment it landed.
+	await refuses('body → required while an entry has no document', { ...held, body: 'required' },
+		show(await readEntry()), 'body_required');
+
+	// With nothing lacking a document, it applies — and applies again in reverse.
+	await call('DELETE', entryRoute(noBody.payload.data._id));
+	const required = await putDefinition({ ...held, body: 'required' });
+	check('body → required applies once every entry has one', required.status === 200, show(required.payload));
+	const optionalAgain = await putDefinition({ ...required.payload.data, body: 'optional' });
+	check('and back to optional applies', optionalAgain.status === 200, show(optionalAgain.payload));
+
+	// 14. The definition file is always parseable and no temporary is left behind.
 	let parses = true;
 	try {
 		JSON.parse(fs.readFileSync(definitionFile(), 'utf8'));
@@ -298,7 +341,7 @@ async function main() {
 	check('the definition file parses', parses);
 	check('no temporary definition file is left behind', !fs.existsSync(definitionFile() + '.tmp'));
 
-	// 14. Legacy collections are untouched: registry languages, no definition, old label heuristic.
+	// 15. Legacy collections are untouched: registry languages, no definition, old label heuristic.
 	const registry = await listed();
 	const writing = registry.find((c) => c.key === 'writing');
 	check('a legacy collection keeps its registry language list', Array.isArray(writing?.translatability),

@@ -100,12 +100,16 @@ inspected to decide what it is — otherwise the change is refused in whole with
   reads the definition for those collections and the registry for legacy ones, and holds no second copy. A
   collection with no definition behaves exactly as before.
 - **Entry saves are checked against the declared shape** (`400 invalid_entry`, `detail.problems`): a
-  per-language value and a document variant may only be keyed by declared languages, and the body policy
-  (`required | optional | none`) is enforced. A shared value is unchecked — it may be arbitrary JSON — and a
-  missing translation is always allowed.
-- **A defined collection's list label comes from its declared `display` field**, never from a guess; legacy
-  collections keep the old heuristic. nDB returns object keys sorted, so stored objects must be compared by
-  value rather than by string.
+  per-language value and a document variant may only be keyed by declared languages, a `docs[language]` value
+  must be a **string** (`not_a_document`), and the body policy (`required | optional | none`) is enforced. A
+  shared value is unchecked — it may be arbitrary JSON — and a missing translation is always allowed.
+- **A `body` policy change is checked against existing entries** before it applies: `none` is refused while
+  documents exist (`body_not_allowed`), `required` while any entry has none (`body_required`).
+- **A defined collection's list label comes from its declared `display` field**, never from a guess. When an
+  entry has no value for it, the summary carries `displayMissing` (the field name) with `title: null`, and the
+  row shows `no <field>` with the id still visible; the label never silently falls back to the entry's name.
+  Legacy collections keep the old heuristic. nDB returns object keys sorted, so stored objects must be compared
+  by value rather than by string.
 
 A collection is a declaration in `data/meta/data.jsonl` plus a folder of its own. The declaration
 is load-bearing: `Database.open()` **creates** a database it cannot find, so membership is checked

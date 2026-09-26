@@ -51,6 +51,12 @@
 	color: var(--text-color-dim);
 }
 
+/* A display field the definition configured but this entry has no value for. */
+.cms-row-missing {
+	color: var(--text-color-dim);
+	font-style: italic;
+}
+
 .cms-row-snippet {
 	overflow: hidden;
 	text-overflow: ellipsis;

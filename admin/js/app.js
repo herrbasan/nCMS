@@ -77,6 +77,9 @@ function buildRow(entry, key) {
 
 	const title = document.createElement('div');
 	title.className = 'cms-row-title';
+	// A configured display field with no value is shown as such, not masked by the entry's name. The id
+	// is still in the row's meta line, so the entry stays identifiable.
+	if (entry.displayMissing) title.classList.add('cms-row-missing');
 	title.textContent = entry.label;
 
 	const snippet = document.createElement('div');
@@ -107,7 +110,12 @@ async function loadEntries(key, pane) {
 	pane.append(list);
 
 	list.loadData({
-		data: entries.map((entry) => ({ ...entry, label: entry.title || entry._id })),
+		// The label is what the row *shows*, so a missing display value reads as missing in the list and
+		// is searchable by the same text rather than by a hidden fallback.
+		data: entries.map((entry) => ({
+			...entry,
+			label: entry.displayMissing ? `no ${entry.displayMissing}` : (entry.title || entry._id)
+		})),
 		render: (entry) => buildRow(entry, key),
 		search: [{ prop: 'label' }, { prop: '_id' }],
 		sort: [
