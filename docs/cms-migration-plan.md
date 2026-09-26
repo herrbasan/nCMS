@@ -170,6 +170,20 @@ form-level validation container. None of these block the pattern; they shape §1
 - **Mostly schemaless entries.** A few fields every dataset needs; the rest is open JSON. Schema is
   defined **per table and optional** — a *view contract*, not a storage constraint, so it can change
   without migrating rows.
+- **Bilingual is one entry with N language variants, never paired entries.** `docs` is keyed by language
+  (`{ en, de? }`) and everything else — `_id`, `name`, `slug`, dates, taxonomy, media references — is
+  **shared**, not duplicated. Language-local data lives in each variant's own frontmatter, so `title`
+  differs per language while the slug does not. Which variants may exist is the collection's
+  `translatability` policy, the only schema a collection itself carries: `works` is en-only, `writing`
+  is en + de. *Decided 2026-09-12 (B2)*, against paired entries: it matches the raum.com manifest
+  precedent (`audio.en/de`, one slug), it does not double the operations of a one-author CMS, and
+  translating is then a plain `PUT` that adds `docs.de`. **A missing variant means the URL does not
+  exist — there is no fallback**, so a document that is only German-speaking is a gap that shows, not
+  one that silently serves the other language.
+  - **What enforces that today: nothing.** `translatability` is declared, stored and editable — the
+    Database axis's set-editor edits it — and no code reads it: not the API on write, not the admin,
+    not a renderer. §3's entry row asks for a `language` column that does not exist, and there is no
+    per-language route. The model is decided; the places that would hold it to account are not built.
 - **Buckets are labels, not directories.** One media pool; membership is a field on the item. Creating or
   deleting a bucket moves no bytes — it is an edit to membership metadata. The "filesystem" appearance is a
   view. nDB expresses this with file buckets plus its own bucket trash (`_trash/files/`).

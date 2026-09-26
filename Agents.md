@@ -90,6 +90,11 @@ is load-bearing: `Database.open()` **creates** a database it cannot find, so mem
 before opening. `key` is the identity (the folder and the API path) and is immutable — `name` and
 `translatability` are what `PATCH` edits.
 
+An **entry** is `{name, slug, docs: {en, de?}}` plus `c_date`/`m_date`. Bilingual is **one entry with N
+language variants**, never paired entries: the identity is shared and language-local data lives in each
+variant's own frontmatter, so the slug is one and the title is per language. `translatability` is the
+collection's policy about which variants may exist — declared but not yet enforced anywhere (plan §5).
+
 Deletion is nDB's tombstone **plus** its document trash (`_trash/docs/data.jsonl`): nothing is
 destroyed until the trash is emptied. `nDB`'s `trash_ttl` / `trash_purge_interval` options are the
 hook for making that a policy rather than a manual act. Deleting a **collection** is the same
