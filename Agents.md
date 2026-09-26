@@ -36,6 +36,8 @@ Zero dependencies: `node:http` for transport, nDB (submodule) in-process for sto
 | `lib/http-error.js` | the error type carrying the wire contract |
 | `admin/` | the SPA — NUI shell (`nui-app` + `nui-sidebar`), `nui-link-list` as the scope axis, `nui-list` as the pane, `nui-code-editor` for raw document editing |
 | `tools/import-n000b.js` | one-shot migration of the old CMS's block tree into MD-Blocks entries — a client of the HTTP API, not a second writer. `--out <dir>` writes previews instead of importing, so the output can be checked with `modules/md-blocks/tools/validate.js` |
+| `tools/probe-ndb.js` | checks the nDB behaviour the design decisions rest on (inert `schemas`, bucket scoping, `close()` and the folder lock, no cross-database read). A drift detector, not a test suite — it is expected to flip when the pin moves |
+| `tools/test-model.js` | end-to-end proof of the proposed data model in its own `model-test` collection: definition in `meta.json`, one bilingual entry with shared/per-language facts and whole MD-Blocks documents, save + reopen + raw-edit, and refusals that leave data unchanged. Needs the server running |
 | `data/` | content, not code — gitignored |
 
 **NUI fluency — read this before writing any admin code.** In order: `documentation/DOCUMENTATION.md`,
@@ -82,8 +84,16 @@ API, with the envelope `{status:true,data}` / `{status:false,error,message,detai
 |---|---|
 | `GET` · `POST` | `/api/collections` |
 | `GET` · `PATCH` · `DELETE` | `/api/collections/:key` |
+| `GET` · `PUT` | `/api/collections/:key/definition` |
 | `GET` · `POST` | `/api/collections/:key/entries` |
 | `GET` · `PUT` · `DELETE` | `/api/collections/:key/entries/:id` |
+
+A collection's **definition** — languages, body policy, display field, per-field kind — lives in that
+collection's own `meta.json` under a `cms` key, beside nDB's own keys, which are preserved untouched
+(brief D1). nDB's `schemas` key in the same file is a different contract and is inert. `PUT` applies the
+**D3a rule**: a change never rewrites or coerces a value and applies only if every existing value stays
+readable under the new definition — otherwise it is refused in whole with `409 definition_conflict` and a
+`detail.conflicts` list of entry ids, fields and codes. Nothing else in this file writes that key.
 
 A collection is a declaration in `data/meta/data.jsonl` plus a folder of its own. The declaration
 is load-bearing: `Database.open()` **creates** a database it cannot find, so membership is checked
