@@ -53,6 +53,18 @@
                         <nui-icon name="brightness">⛭</nui-icon>
                     </button>
                 </nui-button>
+                <!-- The notification bell and its log. `data-notify-badge` keeps the unread count on the button
+                     itself — no JavaScript glue. The popover takes no trigger attribute: it anchors to, and is
+                     opened by, its preceding sibling, which is why the button and the panel are adjacent here
+                     exactly as the library's own header has them. -->
+                <nui-button variant="icon" data-notify-badge>
+                    <button type="button" aria-label="Notifications">
+                        <nui-icon name="notifications">●</nui-icon>
+                    </button>
+                </nui-button>
+                <nui-popover id="notifications" aria-label="Notifications" placement="bottom">
+                    <nui-notification-log></nui-notification-log>
+                </nui-popover>
             </div>
         </nui-app-header>
 
@@ -63,6 +75,19 @@
             <nui-link-list mode="fold" id="main-navigation" aria-label="Collections">
                 <!-- Loaded via JS -->
             </nui-link-list>
+            <!-- Upload progress: a fixed region under the axis, as the old CMS has. It is the one place a
+                 multi-file upload can report itself without competing with the pane, and it is driven by the
+                 request's own progress event — the feed carries changes to *records*, and a byte counter is
+                 not a record. Sticky, because nui-sidebar is a scrolling block container and this must stay
+                 visible while the axis scrolls under it. Idle it is hidden entirely: a permanent progress bar
+                 reads as a notification surface. -->
+            <div class="cms-uploads" id="uploads" hidden>
+                <p class="cms-uploads-label" id="uploads-label"></p>
+                <!-- The library's own progress indicator: self-contained, and reactive to attribute changes, so
+                     the frame updates by setting `value` rather than by reaching into a track and a fill. -->
+                <nui-progress id="uploads-bar" value="0" hide-text></nui-progress>
+                <p class="cms-uploads-stats" id="uploads-stats"></p>
+            </div>
         </nui-sidebar>
 
         <nui-content>

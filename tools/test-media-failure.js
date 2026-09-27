@@ -4,8 +4,8 @@
 // failures be **visible and retryable** cannot be exercised through the live service — this drives the
 // module directly with nMedia made unreachable, then reachable again.
 //
-//   # the server must be stopped: this is a second writer on the same nDB files
-//   node tools/test-media-failure.js
+//   # needs its own data root, so it is not a second writer on the live one
+//   NCMS_DATA_ROOT=<throwaway> node tools/test-media-failure.js
 //
 // It proves:
 //   1. a failed upload stores the original and records a failure per variant, with the reason;
@@ -16,7 +16,14 @@
 // It cleans up after itself by deleting the asset it created.
 
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
+
+// Its own data root unless one is given. It used to require the server to be stopped because it was a second
+// writer on the live root; with `NCMS_DATA_ROOT` that constraint is gone entirely.
+if (!process.env.NCMS_DATA_ROOT) {
+	process.env.NCMS_DATA_ROOT = path.join(os.tmpdir(), `ncms-failure-${Date.now()}`);
+}
 const media = require('../lib/media.js');
 
 const SOURCE = path.join(__dirname, '..', 'docs', 'reference', 'n000b_cms', 'screenshots', '02-raw-database.png');
@@ -34,8 +41,14 @@ async function main() {
 
 	// 1. nMedia unreachable.
 	globalThis.fetch = async () => { throw new Error('connect ECONNREFUSED 192.168.0.100:3500 (injected)'); };
-	const asset = await media.upload({
-		bucket: null, filename: 'failure-probe.png', extension: 'png', mime: 'image/png', buffer
+
+	// The bytes go through the real two-act path: reserve, then hand the pool a file on disk, exactly as the
+	// route does. `acceptBytes` takes a path because the pool *moves* the file rather than buffering it.
+	const reservation = media.reserve({ bucket: null, filename: 'failure-probe.png', size: buffer.length });
+	const staging = path.join(os.tmpdir(), `ncms-failure-probe-${Date.now()}.png`);
+	fs.writeFileSync(staging, buffer);
+	const asset = await media.acceptBytes(reservation._id, {
+		ticket: reservation.ticket, originalPath: staging, size: buffer.length
 	});
 
 	const statuses = Object.values(asset.jobs).map((job) => job.status);

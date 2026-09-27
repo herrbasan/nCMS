@@ -32,6 +32,79 @@
 
 ---
 
+## 0. The task, reframed (2026-09-27)
+
+> **Build a functional copy of the old CMS, with two substitutions: the database replaced by nDB
+> (including its bucket system), and the UI library replaced by `nui_wc2`.**
+
+This is a **port, not a redesign**, and saying so retires most of the ambiguity this document has been
+carrying. The old CMS's own source is the **specification**: `docs/reference/n000b_cms/behaviour-inventory.md`
+extracts its behaviour with `file:line` evidence, and the work is to reproduce that behaviour on the two new
+substrates. Nothing is designed from scratch; where we have already invented something the source does not
+have, the source wins.
+
+**It is tractable because of where the seams already are.** Both dependencies are reached through thin,
+replaceable layers:
+
+| substitution | seam | work |
+|---|---|---|
+| neDB → **nDB** | `Server/js/nedb.js` — `client.collection(db, name)` returns an object with **five methods**: `getDocs(options)`, `getDoc(options)`, `add(data)`, `update(options, data)`, `delete(id)` | **one file** — **BUILT**: `lib/legacy-ndb.js`, 50 assertions in `tools/test-legacy-ndb.js`. `index.js` (≈1620 lines) is not touched — it never sees neDB, only collection objects. |
+| jquery-era NUI → **`nui_wc2`** | the screens' render functions and the block components (`admin/nui/cms_blocks/*`) | replacement per screen, against the same server contract. |
+
+**The size of the database substitution, measured — every shape the 1620 lines actually use:**
+
+| what | used |
+|---|---|
+| queries | `{}` · `{_id}` · `{_id: [ … ]}` (the wrapper turns it into `$or`) · `{bucket}` · `{name}` · `{email}` — **nothing else.** No `$regex`, `$in`, `$gt`, `$elemMatch` anywhere. |
+| sort | `{c_date: -1}` · `{}` |
+| projection | `{email:1}` · `{password:0}` · `{}` (the last two only from `admin`-only query routes) |
+| writes | `{$set: {…}}` on dot-paths · one `{replace:true}` · and `update()` called with a whole document (`:1086`, `:1210`) |
+
+That is a closed set, and nDB covers all of it: `find(field, value)` / `get(id)` / `queryWith(ast,
+{sortBy, sortDir})` / `insert` / `update(id, doc)` / `set(id, path, value)` / `delete(id)`. **The port of the
+data layer is one adapter file plus a modifier translation for `$set`** — not a rewrite.
+
+**Data layout mapping.** Old: one JSON file per collection in a folder per db — `DB_PATH/<db>/<collection>.json`.
+nDB: one database per folder with a single `data.jsonl`. So `(db, collection)` → **an nDB database directory
+`<root>/<db>/<collection>/`**. `('admin','files_db')` → `data/admin/files_db/`; `('collections', <id>)` →
+`data/collections/<id>/`.
+
+**The one place the substitution has a real consequence: the bucket system.** The old CMS kept media bytes
+outside its database — originals at `storage/files/<id>.<ext>`, variants at
+`storage/cache/<size>/<id>.<ext>`. Putting them into nDB buckets is a genuine change, and one measured
+constraint applies: **nDB's refcounting and GC are database-local** (`gc_buckets()` marks from `self.docs`
+and sweeps that database's own `_files/`), so **the asset records and the blobs they reference must live in
+the same database.** A dedicated media database owning both is the shape that satisfies it — which is D7(b)
+in the brief, chosen here by fiat rather than by argument.
+
+**What this reframe retires.** §2's "a new screen is a new scope axis, not a new design" was written for a
+*redesign*; for a port the screens are given, and the equivalent rule is *the old screen is the design*.
+Likewise the items we invented and the source contradicts — the 1024px `thumb_*` variant family
+(`behaviour-inventory.md` §5.1) — are corrected toward the source, not defended.
+
+**What the first week of the reframe actually settled (2026-09-27).** Two of the port's foundations are
+built and tested rather than argued about:
+
+- **The database substitution** — `lib/legacy-ndb.js`, holding the old seam exactly. The measurements above
+  were re-checked against real call sites while writing it, and one of them was **wrong**: `deleteBucket`
+  (`index.js:428`) re-files a bucket's files with a non-id `{multi:true}` write and maps the result as an
+  array, so the write surface is not id-keyed throughout. Full correction, plus the `destroy` bug and the
+  `mongo.js` cross-check, in `reference/n000b_cms/behaviour-inventory.md` §7. **The lesson is in the plan
+  rather than only in the commit:** a grep proves what exists, not what is absent from a surface you then
+  generalise over.
+- **The event feed** — `lib/feed.js` + `GET /api/events` + `POST /api/ping` + `admin/js/events.js`, verified
+  by 42 unit and 31 integration assertions (the latter over a real server on a spare port). A mutation made
+  by one client now reaches another's screen, which is the property the whole design exists for and the one
+  the old CMS was built on. Design and the four decisions the build forced: `upload-and-events-plan.md` §B.
+
+Both were done **without touching `index.js` and without inventing a UI**, which is the reframe working as
+intended: the old source decided the contract, and the new substrates were fitted to it.
+
+**How to use this document now:** §2–§13 remain useful as *our* reasoning and as the record of what nDB and
+nMedia require, but where anything here disagrees with the old CMS's behaviour, the old CMS wins.
+
+---
+
 ## 1. What is being built
 
 An **admin for authoring structured documents** into a flat store, plus a **batch renderer** that turns

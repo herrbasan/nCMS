@@ -3,16 +3,20 @@
  * Only our own elements are styled. NUI components carry their own presentation, and reaching
  * into them would fight the design system.
  *
- * The one exception is .content-col, and it is not an exception really: that class is the
- * wrapper the router generates for a route type (`content-${type}`), and the theme styles its
- * own equivalents the same way (`nui-main > .content-page`). It is the supported hook for
- * "give my route's wrapper the shell's height".
+ * The one exception is the `.content-<type>` wrapper the router generates for a route type, and it
+ * is not an exception really: the theme styles its own equivalents the same way
+ * (`nui-main > .content-page`). It is the supported hook for "give my route's wrapper the shell's
+ * height".
+ *
+ * ⚠️ This must cover **every** route type. A type missing here gets no height, so the virtualized
+ * list inside it renders nothing at all — with no error and no console output.
  */
 
 /* nui-main is absolutely positioned with inset 0, so it has a definite height. The wrapper the
  * router creates for a custom type is a plain block, so the height has to be passed down before
  * a virtualized list can size itself. */
-.content-col {
+.content-col,
+.content-bucket {
 	display: flex;
 	flex-direction: column;
 	block-size: 100%;
@@ -26,11 +30,15 @@
 	min-block-size: 0;
 }
 
+/* A row must carry a DEFINITE height. `.nui-list-item` is absolutely positioned with no height of
+ * its own, and the list detects the first item's rendered height as its `itemHeight`. A percentage
+ * here cannot resolve against an auto-height parent, so it explodes (measured: 22,369,618px) and
+ * every row is then positioned at multiples of that — the list renders empty with no error. */
 .cms-row {
 	display: flex;
 	align-items: center;
 	gap: var(--nui-space);
-	block-size: 100%;
+	block-size: 3.5rem;
 	padding-inline: var(--nui-space);
 }
 
@@ -58,13 +66,33 @@
 }
 
 /* Media rows: a preview, then the label and its processing state. */
-.cms-thumb {
+.cms-thumb-slot {
 	inline-size: 2.5rem;
 	block-size: 2.5rem;
+	flex: 0 0 auto;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.cms-thumb {
+	inline-size: 100%;
+	block-size: 100%;
 	object-fit: cover;
 	border-radius: var(--border-radius1);
 	background: var(--color-shade3);
+}
+
+/* Created over modified, right-aligned — the date pair a list row carries in the old CMS. */
+.cms-row-dates {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
 	flex: 0 0 auto;
+}
+
+.cms-row-dates span:first-child {
+	color: var(--text-color);
 }
 
 .cms-thumb-broken {
@@ -73,46 +101,8 @@
 
 .cms-status-ok { color: var(--text-color-dim); }
 .cms-status-busy { color: var(--color-highlight); }
-.cms-status-bad { color: var(--color-danger, var(--color-highlight)); font-weight: 600; }
+.cms-status-bad { color: var(--palette-alert); font-weight: 600; }
 .cms-status-dim { color: var(--text-color-dim); font-style: italic; }
-
-.cms-media-detail {
-	display: flex;
-	flex-direction: column;
-	gap: var(--nui-space);
-}
-
-.cms-field-reference {
-	font-family: var(--font-family-mono, monospace);
-	font-size: var(--font-size-small);
-}
-
-/* The variant menu: one cell per variant, each carrying its own job state so a failure names itself. */
-.cms-variants {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
-	gap: var(--nui-space);
-}
-
-.cms-variant {
-	margin: 0;
-	display: flex;
-	flex-direction: column;
-	gap: var(--nui-space-half);
-}
-
-.cms-variant img {
-	inline-size: 100%;
-	block-size: 6rem;
-	object-fit: contain;
-	background: var(--color-shade3);
-	border-radius: var(--border-radius1);
-}
-
-.cms-variant figcaption {
-	font-size: var(--font-size-small);
-	word-break: break-word;
-}
 
 .cms-row-snippet {
 	overflow: hidden;
@@ -163,4 +153,89 @@
 .cms-empty {
 	padding: var(--nui-space-double);
 	color: var(--text-color-dim);
+}
+
+/* ─── Upload progress ─────────────────────────────────────────────────────────────────────────
+   A fixed region under the axis, as the old CMS has. nui-sidebar is a scrolling *block* container, so
+   `sticky` is what keeps this at the bottom of the viewport while the navigation scrolls beneath it.
+
+   `[hidden]` needs its own rule here, and that is not a detail: this element sets `display: flex`, which
+   overrides the user-agent's `[hidden] { display: none }`. Without the rule below the region is visible
+   whenever it exists, and the failure looks like "the hide does nothing" rather than like a CSS problem. */
+.cms-uploads {
+	display: flex;
+	flex-direction: column;
+	gap: var(--nui-space-half);
+	position: sticky;
+	inset-block-end: 0;
+	padding: var(--nui-space);
+	border-block-start: 1px solid var(--border-shade2);
+	background: var(--color-base);
+}
+
+.cms-uploads[hidden] { display: none; }
+
+.cms-uploads-label {
+	margin: 0;
+	font-size: var(--font-size-small);
+	color: var(--text-color);
+}
+
+.cms-uploads-stats {
+	margin: 0;
+	font-size: var(--font-size-small);
+	color: var(--text-color-dim);
+	font-variant-numeric: tabular-nums;
+}
+
+/* ─── Page chrome for the server screens ─────────────────────────────────────────────────────
+   A heading, a one-line summary, and whatever actions the screen has. What sits below is built from the
+   library's own components (`nui-table`, `nui-card`, `nui-badge`, `nui-progress`) — this is only the frame,
+   which is the one thing the library does not provide for a routed view. */
+.cms-page {
+	display: flex;
+	flex-direction: column;
+	block-size: 100%;
+	min-block-size: 0;
+}
+
+.cms-page-head {
+	display: flex;
+	align-items: baseline;
+	gap: var(--nui-space);
+	padding-block-end: var(--nui-space);
+}
+
+.cms-page-head h2 { margin: 0; }
+
+.cms-page-meta {
+	margin: 0;
+	font-size: var(--font-size-small);
+	color: var(--text-color-dim);
+}
+
+/* The one thing a table cannot do for itself is scroll. */
+.cms-table-scroll {
+	flex: 1;
+	min-block-size: 0;
+	overflow: auto;
+	font-variant-numeric: tabular-nums;
+}
+
+/* ─── The pool report ─────────────────────────────────────────────────────────────────────────
+   The cards are the library's surface, so nothing here styles a card. What is left is the spacing between
+   them and the heading row inside one, which is our own markup (`h3` + `nui-badge`). */
+.cms-report-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--nui-space);
+	padding-block-start: var(--nui-space);
+}
+
+.cms-report-list h3 {
+	display: flex;
+	align-items: center;
+	gap: var(--nui-space-half);
+	margin: 0 0 var(--nui-space-half);
+	font-size: var(--font-size-base);
 }
